@@ -1,43 +1,110 @@
-apt update
+#!/bin/bash
 
-# installer k3s
-curl -sfL https://get.k3s.io | sh -
+# --- Fonction pour l'affichage ---
+log() {
+    echo -e "\033[1;34m[INFO]\033[0m $1"
+}
 
+# --- Fonction pour gérer Git (Clone ou Pull) ---
+git_manage() {
+    REPO_URL=$1
+    # Récupère le nom du dossier depuis l'URL (ex: simon.git -> simon)
+    DIR_NAME=$(basename "$REPO_URL" .git)
 
-# récupérer la config kube du server local
-mkdir -p ~/.kube
-cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+    if [ -d "$DIR_NAME" ]; then
+        log "Le dossier '$DIR_NAME' existe déjà. Mise à jour (git pull)..."
+        cd "$DIR_NAME" || return
+        git pull
+        cd .. # Retour au dossier parent
+    else
+        log "Clonage de '$DIR_NAME'..."
+        git clone "$REPO_URL"
+    fi
+}
 
-# installer nerdctl 
+# 1. Mise à jour système
+log "Mise à jour des index apt..."
+sudo apt update -qq
+
+# 2. Installer K3s
+if ! command -v k3s &> /dev/null; then
+    log "Installation de K3s..."
+    curl -sfL https://get.k3s.io | sh -
+else
+    log "K3s est déjà installé."
+fi
+
+# 3. Configurer Kubeconfig
+if [ ! -f ~/.kube/config ]; then
+    log "Configuration de ~/.kube/config..."
+    mkdir -p ~/.kube
+    sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+    # Important : on donne les droits à l'utilisateur actuel pour ne pas avoir besoin de sudo pour kubectl
+    sudo chown $(id -u):$(id -g) ~/.kube/config
+else
+    log "Config Kube existante. Ignorée."
+fi
+
+# 4. Installer Nerdctl
 NERDCTL_VERSION="1.7.7"
-wget "https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-full-${NERDCTL_VERSION}-linux-amd64.tar.gz"
-sudo tar Cxzvvf /usr/local - < nerdctl-full-${NERDCTL_VERSION}-linux-amd64.tar.gz
-sudo systemctl enable --now buildkit
-mkdir -p ~/.config/nerdctl
-cat <<EOF > ~/.config/nerdctl/nerdctl.toml
+if ! command -v nerdctl &> /dev/null; then
+    log "Installation de Nerdctl v${NERDCTL_VERSION}..."
+    wget -q "https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-full-${NERDCTL_VERSION}-linux-amd64.tar.gz"
+    
+    sudo tar Cxzvvf /usr/local - < nerdctl-full-${NERDCTL_VERSION}-linux-amd64.tar.gz
+    sudo systemctl enable --now buildkit
+    
+    mkdir -p ~/.config/nerdctl
+    cat <<EOF > ~/.config/nerdctl/nerdctl.toml
 address = "/run/k3s/containerd/containerd.sock"
 namespace = "k8s.io"
 EOF
-rm nerdctl-full-1.7.7-linux-amd64.tar.gz
+    rm "nerdctl-full-${NERDCTL_VERSION}-linux-amd64.tar.gz"
+else
+    log "Nerdctl est déjà installé."
+fi
 
-# installer skaffold
-curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64
-sudo install skaffold /usr/local/bin/
-rm skaffold
+# 5. Installer Skaffold (Via GitHub pour éviter l'erreur de connexion)
+if ! command -v skaffold &> /dev/null; then
+    log "Installation de Skaffold..."
+    # Utilisation de wget + GitHub Releases
+    wget -O skaffold https://github.com/GoogleContainerTools/skaffold/releases/latest/download/skaffold-linux-amd64
+    
+    # Vérification que le fichier n'est pas vide avant d'installer
+    if [ -s skaffold ]; then
+        sudo install skaffold /usr/local/bin/
+        rm skaffold
+    else
+        echo "ERREUR : Le téléchargement de Skaffold a échoué."
+        exit 1
+    fi
+else
+    log "Skaffold est déjà installé."
+fi
 
-# cloner le frontend client
-git clone https://iut-git.unice.fr/simon/simon
+# --- Section GIT ---
 
-# cloner les dépôts IOT
-mkdir iot
-cd iot
-git clone https://iut-git.unice.fr/simon/iot/capteur
-git clone https://iut-git.unice.fr/simon/iot/passerelle
+# 6. Frontend Client
+log "--- Gestion du Frontend ---"
+git_manage "https://iut-git.unice.fr/simon/simon"
 
-# cloner les API
-cd ..
-mkdir APIs
-cd APIs
-git clone https://iut-git.unice.fr/simon/services/api-capteur
-git clone https://iut-git.unice.fr/simon/services/api-ingestion
-git clone https://iut-git.unice.fr/simon/services/serviceauthent
+# 7. IOT
+log "--- Gestion des dépôts IOT ---"
+mkdir -p iot
+cd iot || exit
+# On est maintenant dans le dossier /iot
+git_manage "https://iut-git.unice.fr/simon/iot/capteur"
+git_manage "https://iut-git.unice.fr/simon/iot/passerelle"
+cd .. # Retour à la racine
+
+# 8. APIs
+log "--- Gestion des APIs ---"
+mkdir -p APIs
+cd APIs || exit
+# On est maintenant dans le dossier /APIs
+git_manage "https://iut-git.unice.fr/simon/services/api-capteur"
+git_manage "https://iut-git.unice.fr/simon/services/api-ingestion"
+git_manage "https://iut-git.unice.fr/simon/services/serviceauthent"
+cd .. # Retour à la racine
+
+log "Installation et mise à jour terminées avec succès !"
