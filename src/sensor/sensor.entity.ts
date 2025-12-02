@@ -15,7 +15,7 @@ export class Sensor {
     })
     origin: string;
 
-    @Column("api_key")
+    @Column({ name: "api_key" })
     apiKey: string;
 
     @Column({ nullable: false })
