@@ -2,11 +2,17 @@ import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateSensorDto {
     @ApiProperty()
-    nom: string
+    nom: string;
 
     @ApiProperty()
-    type: string
+    origin: string;
 
     @ApiProperty()
-    localisation: string
+    apiKey: string;
+
+    @ApiProperty()
+    type: string;
+
+    @ApiProperty()
+    localisation: string;
 }

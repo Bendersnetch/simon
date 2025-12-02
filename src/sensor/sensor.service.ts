@@ -13,6 +13,9 @@ export class SensorService {
         return this.sensorRepository.save(sensor);
     }
 
+    /*
+    async updateSensor(id: number, ) */
+
     async updateStatusSensor(id: number, status: boolean): Promise<Sensor> {
         const sensor = await this.sensorRepository.findOne({ where: {id} });
 
