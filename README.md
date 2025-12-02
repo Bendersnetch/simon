@@ -21,8 +21,8 @@ git clone https://iut-git.unice.fr/simon/infra
 
 ## Lancement du script
 ```bash
-chmod +x ./infra/script-init-dev-env.sh
-./infra/script-init-dev-env.sh
+chmod +x ./infra/script-init-dev-env
+./infra/script-init-dev-env
 ```
 
 
