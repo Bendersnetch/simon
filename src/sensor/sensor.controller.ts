@@ -1,5 +1,4 @@
-import { Controller, Post, Body, Param, Patch } from '@nestjs/common';
-import { ApiParam } from '@nestjs/swagger';
+import { Controller, Post, Put, Body, Param, Patch, Delete, HttpCode } from '@nestjs/common';
 import { SensorService } from './sensor.service';
 import { CreateSensorDto } from './dto/create-sensor.dto';
 import { UpdateStatusSensorDto } from './dto/update-status-sensor.dto';
@@ -9,12 +8,23 @@ export class SensorController {
     constructor(private readonly sensorService: SensorService) {}
 
     @Post()
-    receiveValue(@Body() createSensorDto: CreateSensorDto) {
-        return this.sensorService.createSensor(createSensorDto);
+    async createSensor(@Body() createSensorDto: CreateSensorDto) {
+        return await this.sensorService.createSensor(createSensorDto);
     }
 
     @Patch(":id/status")
-    updateStatus(@Param("id") id: number, @Body() updateStatusSensorDto: UpdateStatusSensorDto) {
-        return this.sensorService.updateStatusSensor(id, updateStatusSensorDto.status);
+    async updateStatus(@Param("id") id: number, @Body() updateStatusSensorDto: UpdateStatusSensorDto) {
+        return await this.sensorService.updateStatusSensor(id, updateStatusSensorDto.status);
     }
+
+    @Put(":id")
+    async updateSensor(@Param("id") id: number, @Body() createSensorDto: CreateSensorDto) {
+        return await this.sensorService.updateSensor(id, createSensorDto);
+    }
+
+    @Delete(":id")
+    @HttpCode(204)
+    async deleteSensor(@Param("id") id: number) {
+        await this.sensorService.deleteSensor(id);
+    }   
 }

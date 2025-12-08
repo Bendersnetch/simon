@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Sensor } from './sensor.entity';
 import { CreateSensorDto } from './dto/create-sensor.dto';
 import { Point } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class SensorService {
@@ -20,7 +21,8 @@ export class SensorService {
             origin: createSensorDto.origin,
             apiKey: createSensorDto.apiKey,
             type: createSensorDto.type,
-            localisation: point
+            localisation: point,
+            status: createSensorDto.active ?? false
         });
         return this.sensorRepository.save(sensor);
     }
@@ -34,5 +36,39 @@ export class SensorService {
 
         sensor.status = status;
         return this.sensorRepository.save(sensor);
+    }
+
+    async updateSensor(id: number, createSensorDto: CreateSensorDto) {
+        const sensor = await this.sensorRepository.findOne({ where: {id} });
+
+        if (!sensor) {
+            throw new NotFoundException(`Sensor ${id} not found`);
+        }
+
+        if (createSensorDto.apiKey) {
+            createSensorDto.apiKey = await bcrypt.hash(createSensorDto.apiKey, 10);
+        }
+
+        const point: Point = {
+            type: 'Point',
+            coordinates: [createSensorDto.longitude, createSensorDto.latitude]
+        }
+
+        sensor.nom = createSensorDto.nom;
+        sensor.origin = createSensorDto.origin;
+        sensor.apiKey = createSensorDto.apiKey;
+        sensor.type = createSensorDto.type;
+        sensor.localisation = point
+        sensor.status = createSensorDto.active ?? sensor.status
+
+        return this.sensorRepository.save(sensor);
+    }
+
+    async deleteSensor(id: number) {
+        const result = await this.sensorRepository.delete(id);
+
+        if (result.affected === 0) {
+            throw new NotFoundException(`Sensor with id ${id} not found`);
+        }
     }
 }

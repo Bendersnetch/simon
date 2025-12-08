@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, Min, Max, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsNumber, IsBoolean, Min, Max, IsString, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateSensorDto {
@@ -32,4 +32,9 @@ export class CreateSensorDto {
     @Min(-90)
     @Max(90)
     latitude: number;
+
+    @ApiPropertyOptional({ default: false })
+    @IsOptional()
+    @IsBoolean()
+    active?: boolean;
 }
