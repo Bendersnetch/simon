@@ -1,4 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, BeforeInsert } from "typeorm";
+import type { Point } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 @Entity()
@@ -21,8 +22,8 @@ export class Sensor {
     @Column({ nullable: false })
     type: string;
 
-    @Column({ nullable: false })
-    localisation: string;
+    @Column({ type: 'geometry', spatialFeatureType: 'Point', srid: 4326, nullable: false })
+    localisation: Point;
 
     @Column({
         name: 'date_installation',
