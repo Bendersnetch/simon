@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sensor } from './sensor.entity';
@@ -10,6 +10,21 @@ import * as bcrypt from 'bcrypt';
 export class SensorService {
     constructor(@InjectRepository(Sensor) private readonly sensorRepository: Repository<Sensor>) {}
 
+    async getSensorByOrigin(origin: string, apiKey: string): Promise<Sensor> {
+        const sensor = await this.sensorRepository.findOne({ where: {origin} });
+
+        if (!sensor) {
+            throw new NotFoundException(`Sensor ${origin} not found`);
+        }
+
+        const isValid = await bcrypt.compare(apiKey, sensor.apiKey);
+        if (!isValid) {
+            throw new UnauthorizedException('Invalid API key');
+        }
+
+        return sensor;
+    }
+    
     async createSensor(createSensorDto: CreateSensorDto): Promise<Sensor> {
         const point: Point = {
             type: 'Point',
@@ -38,7 +53,7 @@ export class SensorService {
         return this.sensorRepository.save(sensor);
     }
 
-    async updateSensor(id: number, createSensorDto: CreateSensorDto) {
+    async updateSensor(id: number, createSensorDto: CreateSensorDto): Promise<Sensor> {
         const sensor = await this.sensorRepository.findOne({ where: {id} });
 
         if (!sensor) {

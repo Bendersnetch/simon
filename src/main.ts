@@ -6,7 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Validatio automatique des données entrées dans l'API
+  // Validation automatique des données entrées dans l'API
   app.useGlobalPipes(new ValidationPipe());
 
   app.setGlobalPrefix("api/v1");
