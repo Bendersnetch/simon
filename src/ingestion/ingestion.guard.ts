@@ -15,11 +15,11 @@ export class IngestionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const apiKey = request.headers['x-api-key'];
-    const origin = request.headers['origin'];
-    console.log(origin);
+    const body = request.body;
+    const origin = body?.origin;
 
-    if (!apiKey) {
-      throw new UnauthorizedException('API key missing');
+    if (!apiKey || !origin) {
+      throw new UnauthorizedException('API key or origin is missing');
     }
 
     let sensor: Sensor | undefined;

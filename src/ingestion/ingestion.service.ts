@@ -1,19 +1,24 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CassandraService } from 'src/cassandra/cassandra.service';
-import { IngestionTempDto } from './ingestionTempDto';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
+import { Ingestion } from './ingestion.entity';
 
 @Injectable()
 export class IngestionService {
-    constructor(private readonly cassandraService: CassandraService,
-        @Inject(CACHE_MANAGER) private cache: Cache) {}
+    constructor(private readonly cassandraService: CassandraService) {}
 
-    private CACHE_TTL = 60;
+    async addSensorData(ingestion: Ingestion) {
+        const query = `INSERT INTO mesure_capteur 
+        (origin, timestamp, uv, temperature, humidite, qair) 
+        VALUES (?, ?, ?, ?, ?, ?);`
 
-    async addSensorData(ingestionTempDto: IngestionTempDto) {
-        const query = "INSERT INTO test (id, value) VALUES (?, ?)";
-
-        await this.cassandraService.execute(query, [ingestionTempDto.id, "test"]);
+        await this.cassandraService.execute(query,
+            [
+                ingestion.origin,
+                ingestion.timestamp,
+                ingestion.uv,
+                ingestion.temperature,
+                ingestion.humidite,
+                ingestion.qair
+            ]);
     }
-}
+}   

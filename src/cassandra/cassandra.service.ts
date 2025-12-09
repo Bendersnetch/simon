@@ -5,7 +5,7 @@ import { Client } from 'cassandra-driver';
 export class CassandraService implements OnModuleInit, OnModuleDestroy {
     private client: Client;
 
-    onModuleInit() {
+    async onModuleInit() {
         this.client = new Client({
             contactPoints: ['127.0.0.1'],
             localDataCenter: 'datacenter1',
