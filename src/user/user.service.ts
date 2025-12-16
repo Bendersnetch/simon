@@ -48,5 +48,4 @@ export class UserService {
   async updateLastConnection(userId: number, date: Date): Promise<void> {
     await this.userRepository.update(userId, { lastConnection: date });
   }
-
 }
