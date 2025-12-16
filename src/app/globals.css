@@ -1,4 +1,5 @@
 @import "bootstrap/dist/css/bootstrap.min.css";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   --background: #ffffff;
@@ -41,4 +42,14 @@ a {
   html {
     color-scheme: dark;
   }
+}
+
+/* Force hide Next.js Dev Tools Indicator */
+[data-nextjs-toast],
+.nextjs-toast-errors-parent,
+nextjs-portal {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
