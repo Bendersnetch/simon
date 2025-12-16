@@ -14,7 +14,7 @@ async function bootstrap() {
   // Config swagger
   const config = new DocumentBuilder()
   .setTitle("API Authentification & User")
-  .setDescription("Documentation de l'API gérant l'authentification et les utilisateurs'")
+  .setDescription("Documentation de l'API gérant l'authentification et les utilisateurs")
   .setVersion("1.0")
   .build();
 
