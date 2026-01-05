@@ -27,6 +27,8 @@ export default function Page() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mapCenter, setMapCenter] = useState([43.6045, 1.4442]); // Toulouse par défaut
 
+  const [isSearching, setIsSearching] = useState(false);
+
   const handleLogin = (e) => {
     e.preventDefault();
     setIsLoggedIn(true);
@@ -60,6 +62,17 @@ export default function Page() {
           center={mapCenter}
         />
       </div>
+
+      {isSearching && (
+        <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 z-2">
+          <div className="text-center">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Chargement...</span>
+            </div>
+            <p className="mt-2">Recherche en cours...</p>
+          </div>
+        </div>
+      )}
 
       {/* ================= HEADER ================= */}
       <header className="position-absolute top-0 start-0 end-0 z-3 px-4 py-3 d-flex align-items-center justify-content-between gap-4">
@@ -104,19 +117,24 @@ export default function Page() {
                 if (e.key === "Enter") {
                   e.preventDefault();
                   if (!searchQuery) return;
-
-                  const res = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                      searchQuery
-                    )}`
-                  );
-                  const data = await res.json();
-
-                  if (data && data.length > 0) {
-                    setMapCenter([
-                      parseFloat(data[0].lat),
-                      parseFloat(data[0].lon),
-                    ]);
+                  setIsSearching(true);
+                  try {
+                    const res = await fetch(
+                      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                        searchQuery
+                      )}`
+                    );
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                      setMapCenter([
+                        parseFloat(data[0].lat),
+                        parseFloat(data[0].lon),
+                      ]);
+                    }
+                  } catch (error) {
+                    console.error(error);
+                  } finally {
+                    setIsSearching(false);
                   }
                 }
               }}
