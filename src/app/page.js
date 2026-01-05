@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { Button, Modal, Form } from "react-bootstrap";
 import LoginScreen from "./LoginScreen";
+import RegisterScreen from "./RegisterScreen";
 
 // Map (Leaflet) – désactivé côté SSR
 const Map = dynamic(() => import("./components/Map"), {
@@ -18,6 +19,7 @@ const Map = dynamic(() => import("./components/Map"), {
 export default function Page() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
   const [showPollution, setShowPollution] = useState(true);
@@ -29,6 +31,23 @@ export default function Page() {
     e.preventDefault();
     setIsLoggedIn(true);
     setShowLoginModal(false);
+  };
+
+  const handleRegister = (e) => {
+    e.preventDefault();
+    // Ici vous pourriez ajouter la logique d'inscription
+    setIsLoggedIn(true);
+    setShowRegisterModal(false);
+  };
+
+  const switchToRegister = () => {
+    setShowLoginModal(false);
+    setShowRegisterModal(true);
+  };
+
+  const switchToLogin = () => {
+    setShowRegisterModal(false);
+    setShowLoginModal(true);
   };
 
   return (
@@ -216,6 +235,16 @@ export default function Page() {
         <LoginScreen
           onLogin={handleLogin}
           onCancel={() => setShowLoginModal(false)}
+          onSwitchToRegister={switchToRegister}
+        />
+      )}
+
+      {/* ================= REGISTER ================= */}
+      {showRegisterModal && (
+        <RegisterScreen
+          onRegister={handleRegister}
+          onCancel={() => setShowRegisterModal(false)}
+          onSwitchToLogin={switchToLogin}
         />
       )}
     </div>

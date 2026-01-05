@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
+export default function RegisterScreen({ onRegister, onCancel, onSwitchToLogin }) {
     return (
         <div className="login-screen-container position-fixed top-0 start-0 w-100 h-100 bg-white" style={{ zIndex: 2000 }}>
 
@@ -38,7 +38,7 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                     </div>
 
                     <h2 className="h5 fw-bold mb-4 text-slate-800">
-                        Connexion Requise
+                        Création de Compte
                     </h2>
 
                     <div className="d-flex flex-column gap-3 mb-4">
@@ -49,7 +49,17 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                                     <circle cx="12" cy="7" r="4"></circle>
                                 </svg>
                             </div>
-                            <input type="text" placeholder="Identifiant" defaultValue="Admin_01" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                            <input type="text" placeholder="Identifiant" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                        </div>
+
+                        <div className="position-relative">
+                            <div className="position-absolute top-50 start-0 translate-middle-y ms-3 text-slate-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                            </div>
+                            <input type="email" placeholder="Email" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
                         </div>
 
                         <div className="position-relative">
@@ -59,26 +69,27 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                             </div>
-                            <input type="password" placeholder="Mot de passe" defaultValue="•••••••••" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                            <input type="password" placeholder="Mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
                         </div>
-                    </div>
 
-                    <div className="text-center mb-3">
-                        <p className="text-slate-600 small mb-0">
-                            Vous n'avez pas de compte ?{' '}
-                            <button onClick={onSwitchToRegister} className="btn btn-link text-danger text-decoration-none p-0 fw-bold">
-                                Inscrivez-vous !
-                            </button>
-                        </p>
+                        <div className="position-relative">
+                            <div className="position-absolute top-50 start-0 translate-middle-y ms-3 text-slate-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </div>
+                            <input type="password" placeholder="Confirmer le mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                        </div>
                     </div>
 
                     <div className="d-flex justify-content-between align-items-center mb-4">
                         <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium" onClick={onCancel}>Annuler</button>
-                        <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium">Mot de passe oublié ?</button>
+                        <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium" onClick={onSwitchToLogin}>Déjà un compte ?</button>
                     </div>
 
-                    <button onClick={onLogin} className="btn btn-danger w-100 py-3 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none' }}>
-                        <span>Connexion</span>
+                    <button onClick={onRegister} className="btn btn-danger w-100 py-3 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none' }}>
+                        <span>S'inscrire</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                             <polyline points="12 5 19 12 12 19"></polyline>
@@ -151,10 +162,10 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                 </div>
 
                 {/* PARTIE DROITE */}
-                <div className="bg-white d-flex flex-column justify-content-center px-5 shadow-lg position-relative" style={{ width: '600px', zIndex: 10 }}>
-                    <div className="w-100 mx-auto" style={{ maxWidth: '400px' }}>
-                        <h2 className="display-6 fw-bold mb-3 text-slate-800">Connexion Admin</h2>
-                        <p className="text-slate-500 mb-5">Accédez à l'interface de gestion des capteurs</p>
+                <div className="bg-white d-flex flex-column px-5 shadow-lg position-relative overflow-auto" style={{ width: '600px', zIndex: 10 }}>
+                    <div className="w-100 mx-auto py-5" style={{ maxWidth: '400px' }}>
+                        <h2 className="display-6 fw-bold mb-3 text-slate-800">Création de Compte</h2>
+                        <p className="text-slate-500 mb-5">Créez votre compte pour accéder à SIMON</p>
 
                         <div className="d-flex flex-column gap-4 mb-5">
                             <div>
@@ -166,7 +177,19 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                                             <circle cx="12" cy="7" r="4"></circle>
                                         </svg>
                                     </div>
-                                    <input type="text" placeholder="Entrez votre identifiant" defaultValue="Admin_01" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                    <input type="text" placeholder="Entrez votre identifiant" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="form-label small fw-bold text-slate-600">Email</label>
+                                <div className="position-relative">
+                                    <div className="position-absolute top-50 start-0 translate-middle-y ms-3 text-slate-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                            <polyline points="22,6 12,13 2,6"></polyline>
+                                        </svg>
+                                    </div>
+                                    <input type="email" placeholder="Entrez votre email" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
                                 </div>
                             </div>
                             <div>
@@ -178,32 +201,36 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                                             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                         </svg>
                                     </div>
-                                    <input type="password" placeholder="Entrez votre mot de passe" defaultValue="•••••••••" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                    <input type="password" placeholder="Entrez votre mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="form-label small fw-bold text-slate-600">Confirmer le mot de passe</label>
+                                <div className="position-relative">
+                                    <div className="position-absolute top-50 start-0 translate-middle-y ms-3 text-slate-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                        </svg>
+                                    </div>
+                                    <input type="password" placeholder="Confirmez votre mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="d-flex align-items-center justify-content-between mb-4">
-                            <label className="d-flex align-items-center gap-2 cursor-pointer small text-slate-600">
-                                <input type="checkbox" className="form-check-input mt-0 border-slate-300" style={{ boxShadow: 'none' }} />
-                                <span>Se souvenir de moi</span>
-                            </label>
-                            <button className="btn btn-link text-danger text-decoration-none p-0 small fw-bold">Mot de passe oublié ?</button>
-                        </div>
-
-                        <div className="text-center mb-5">
-                            <p className="text-slate-600 small mb-0">
-                                Vous n'avez pas de compte ?{' '}
-                                <button onClick={onSwitchToRegister} className="btn btn-link text-danger text-decoration-none p-0 fw-bold">
-                                    Inscrivez-vous !
+                        <div className="text-center mb-4">
+                            <p className="text-slate-600 small">
+                                Vous avez déjà un compte ?{' '}
+                                <button onClick={onSwitchToLogin} className="btn btn-link text-danger text-decoration-none p-0 fw-bold">
+                                    Connectez-vous !
                                 </button>
                             </p>
                         </div>
 
                         <div className="d-flex gap-3 mb-5">
                             <button onClick={onCancel} className="btn btn-light border w-50 py-3 rounded-3 fw-bold text-slate-600">Annuler</button>
-                            <button onClick={onLogin} className="btn btn-danger w-100 py-3 rounded-3 fw-bold shadow-lg d-flex align-items-center justify-content-center gap-3" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none', fontSize: '1.1rem' }}>
-                                <span>Se connecter</span>
+                            <button onClick={onRegister} className="btn btn-danger w-100 py-3 rounded-3 fw-bold shadow-lg d-flex align-items-center justify-content-center gap-3" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none', fontSize: '1.1rem' }}>
+                                <span>S'inscrire</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                     <polyline points="12 5 19 12 12 19"></polyline>
