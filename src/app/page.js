@@ -28,6 +28,8 @@ export default function Page() {
   const [mapCenter, setMapCenter] = useState([43.6045, 1.4442]); // Toulouse par défaut
 
   const [isSearching, setIsSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -112,11 +114,40 @@ export default function Page() {
               className="form-control border-0 p-0 shadow-none"
               placeholder="Rechercher un lieu, une adresse…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={async (e) => {
+                const value = e.target.value;
+                setSearchQuery(value);
+                if (value.length > 3) {
+                  try {
+                    const res = await fetch(
+                      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                        value
+                      )}&limit=5`
+                    );
+                    const data = await res.json();
+                    setSuggestions(data);
+                    setShowSuggestions(true);
+                  } catch (error) {
+                    console.error(error);
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                  }
+                } else {
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                }
+              }}
+              onBlur={() => {
+                // Plus de délai, on cache immédiatement
+                setShowSuggestions(false);
+                setSuggestions([]);
+              }}
               onKeyDown={async (e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
                   if (!searchQuery) return;
+                  setShowSuggestions(false);
+                  setSuggestions([]);
                   setIsSearching(true);
                   try {
                     const res = await fetch(
@@ -136,11 +167,48 @@ export default function Page() {
                   } finally {
                     setIsSearching(false);
                   }
+                } else if (e.key === "Escape") {
+                  setShowSuggestions(false);
+                  setSuggestions([]);
                 }
               }}
             />
           </div>
         </div>
+
+        {/* Dropdown des suggestions */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div
+            className="position-absolute bg-white border rounded-4 shadow-sm mt-1"
+            style={{
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '420px',
+              maxWidth: '100%',
+              zIndex: 10
+            }}
+          >
+            {suggestions.map((suggestion, index) => (
+              <div
+                key={index}
+                className="px-3 py-2 cursor-pointer hover-bg-light"
+                style={{ cursor: 'pointer' }}
+                onMouseDown={() => {
+                  setSearchQuery(suggestion.display_name);
+                  setMapCenter([parseFloat(suggestion.lat), parseFloat(suggestion.lon)]);
+                  setShowSuggestions(false);
+                  setSuggestions([]);
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+              >
+                <div className="fw-semibold">{suggestion.display_name.split(',')[0]}</div>
+                <div className="small text-muted">{suggestion.display_name}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Actions */}
         {!isLoggedIn ? (
