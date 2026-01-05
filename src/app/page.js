@@ -1,24 +1,29 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
-import LoginScreen from './LoginScreen';
-import dynamic from 'next/dynamic';
+import React, { useState } from "react";
+import dynamic from "next/dynamic";
+import { Button, Modal, Form } from "react-bootstrap";
+import LoginScreen from "./LoginScreen";
 
-// Dynamic import for Leaflet map to avoid server-side issues
-const Map = dynamic(() => import('./components/Map'), {
+// Map (Leaflet) – désactivé côté SSR
+const Map = dynamic(() => import("./components/Map"), {
   ssr: false,
-  loading: () => <div className="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">Chargement de la carte...</div>
+  loading: () => (
+    <div className="w-100 h-100 d-flex align-items-center justify-content-center text-muted bg-light">
+      Chargement de la carte…
+    </div>
+  ),
 });
 
-export default function SIMONInterface() {
+export default function Page() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Map Layer States
   const [showPollution, setShowPollution] = useState(true);
   const [showVegetation, setShowVegetation] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mapCenter, setMapCenter] = useState([43.6045, 1.4442]); // Toulouse par défaut
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -26,123 +31,179 @@ export default function SIMONInterface() {
     setShowLoginModal(false);
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-  };
-
   return (
-    <div style={{ width: '100%', minHeight: '100vh', position: 'relative' }} className="bg-light overflow-hidden text-dark font-sans">
-
-      {/* ========================================= */}
-      {/* FOND DE CARTE - Plein écran              */}
-      {/* ========================================= */}
-      {/* ========================================= */}
-      {/* LEAFLET MAP - Full Screen                 */}
-      {/* ========================================= */}
-      <div className="position-absolute w-100 h-100 start-0 top-0 z-0">
-        <Map />
+    <div className="position-relative w-100 min-vh-100 overflow-hidden bg-light text-dark">
+      {/* ================= CARTE PLEIN ÉCRAN ================= */}
+      <div className="position-absolute top-0 start-0 w-100 h-100 z-0">
+        <Map
+          showPollution={showPollution}
+          showVegetation={showVegetation}
+          center={mapCenter}
+        />
       </div>
 
-
-
-
-
-
-
-      {/* ========================================= */}
-      {/* HEADER                                    */}
-      {/* ========================================= */}
-      <div className="position-absolute top-0 start-0 end-0 p-4 d-flex align-items-center gap-4 z-2">
-
-        {/* Logo Text Only */}
-        <div className="d-flex align-items-center gap-3">
-          <span className="h4 fw-bold mb-0 text-dark">SIMON</span>
-          {isLoggedIn && (
-            <span className="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">ADMIN</span>
-          )}
+      {/* ================= HEADER ================= */}
+      <header className="position-absolute top-0 start-0 end-0 z-3 px-4 py-3 d-flex align-items-center justify-content-between gap-4">
+        {/* Logo */}
+        <div className="d-flex align-items-center gap-2 flex-shrink-0">
+          <div
+            className="bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center"
+            style={{ width: 40, height: 40 }}
+          >
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 0c-.69 0-1.37.176-2 .5C5.37.176 4.69 0 4 0 1.79 0 0 1.79 0 4v4c0 3.866 3.582 7.25 8 8 4.418-.75 8-4.134 8-8V4c0-2.21-1.79-4-4-4-.69 0-1.37.176-2 .5C9.37.176 8.69 0 8 0z" />
+            </svg>
+          </div>
+          <span className="fw-bold fs-5">SIMON</span>
         </div>
 
-        <div className="flex-grow-1"></div>
+        {/* Barre de recherche */}
+        <div className="flex-grow-1 d-flex justify-content-center">
+          <div
+            className="bg-white rounded-4 shadow-sm px-3 py-2 d-flex align-items-center gap-2"
+            style={{ maxWidth: 420, width: "100%" }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              className="form-control border-0 p-0 shadow-none"
+              placeholder="Rechercher un lieu, une adresse…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (!searchQuery) return;
 
-        {/* Login / Actions */}
+                  const res = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                      searchQuery
+                    )}`
+                  );
+                  const data = await res.json();
+
+                  if (data && data.length > 0) {
+                    setMapCenter([
+                      parseFloat(data[0].lat),
+                      parseFloat(data[0].lon),
+                    ]);
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Actions */}
         {!isLoggedIn ? (
           <Button
             variant="primary"
-            className="d-flex align-items-center gap-2 rounded-4 px-4 py-2 shadow-sm"
-            style={{ height: '56px' }}
+            className="rounded-4 px-4 py-2 shadow-sm flex-shrink-0"
             onClick={() => setShowLoginModal(true)}
           >
-            <span>Connexion Admin</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-              <polyline points="10 17 15 12 10 7"></polyline>
-              <line x1="15" y1="12" x2="3" y2="12"></line>
-            </svg>
+            Connexion Admin
           </Button>
         ) : (
-          <>
+          <div className="d-flex align-items-center gap-3 flex-shrink-0">
             <Button
               variant="primary"
-              className="d-flex align-items-center gap-2 rounded-4 px-4 py-2 shadow-sm"
-              style={{ height: '56px' }}
+              className="rounded-4 px-4 py-2 shadow-sm"
               onClick={() => setShowAddModal(true)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              <span>Nouveau module</span>
+              + Nouveau module
             </Button>
-            <div
-              className="rounded-circle bg-white bg-opacity-75 d-flex align-items-center justify-content-center text-danger border border-secondary-subtle shadow-sm cursor-pointer"
-              style={{ width: '56px', height: '56px', backdropFilter: 'blur(10px)', cursor: 'pointer' }}
-              onClick={handleLogout}
+            <Button
+              variant="light"
+              className="rounded-circle shadow-sm"
+              style={{ width: 48, height: 48 }}
+              onClick={() => setIsLoggedIn(false)}
               title="Déconnexion"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-            </div>
-          </>
+              ⎋
+            </Button>
+          </div>
         )}
+      </header>
 
-      </div>
+      {/* ================= PANNEAU CALQUES ================= */}
+      <aside
+        className="position-absolute z-3"
+        style={{ top: 96, left: 24, width: 260 }}
+      >
+        <div className="bg-white rounded-4 shadow-sm p-3">
+          <p className="fw-bold small text-muted mb-3">CALQUES ACTIFS</p>
 
+          {/* Pollution */}
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <div className="fw-semibold">Pollution (NO₂)</div>
+              <div className="small text-muted">Capteurs temps réel</div>
+            </div>
+            <Form.Check
+              type="switch"
+              checked={showPollution}
+              onChange={() => setShowPollution(!showPollution)}
+            />
+          </div>
 
+          {/* Végétation */}
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <div className="fw-semibold">Zones végétales</div>
+              <div className="small text-muted">Arbres & espaces verts</div>
+            </div>
+            <Form.Check
+              type="switch"
+              checked={showVegetation}
+              onChange={() => setShowVegetation(!showVegetation)}
+            />
+          </div>
+        </div>
+      </aside>
 
-
-
-      {/* ========================================= */}
-      {/* ADD MODULE MODAL                          */}
-      {/* ========================================= */}
+      {/* ================= MODALE AJOUT MODULE ================= */}
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)} centered>
         <Modal.Body className="p-4">
-          <h4 className="fw-bold mb-2">Nouveau module</h4>
-          <p className="text-muted mb-4 small">Ajoutez un module sur la carte de surveillance.</p>
+          <h4 className="fw-bold">Nouveau module</h4>
+          <p className="text-muted small mb-4">
+            Ajoutez un module sur la carte de surveillance.
+          </p>
 
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label className="small fw-bold text-secondary">ID Capteur</Form.Label>
-              <Form.Control type="text" placeholder="ex: SENS-202X" className="rounded-3" />
+              <Form.Label>ID capteur</Form.Label>
+              <Form.Control placeholder="SENS-202X" />
             </Form.Group>
-            <div className="row g-3 mb-4">
+
+            <div className="row g-2 mb-4">
               <div className="col">
-                <Form.Label className="small fw-bold text-secondary">Latitude</Form.Label>
-                <Form.Control type="text" defaultValue="43.6045" className="rounded-3" />
+                <Form.Control placeholder="Latitude" />
               </div>
               <div className="col">
-                <Form.Label className="small fw-bold text-secondary">Longitude</Form.Label>
-                <Form.Control type="text" defaultValue="1.4442" className="rounded-3" />
+                <Form.Control placeholder="Longitude" />
               </div>
             </div>
 
             <div className="d-flex gap-2">
-              <Button variant="outline-secondary" className="flex-grow-1 py-2 rounded-3" onClick={() => setShowAddModal(false)}>
+              <Button
+                variant="outline-secondary"
+                className="flex-fill"
+                onClick={() => setShowAddModal(false)}
+              >
                 Annuler
               </Button>
-              <Button variant="primary" className="flex-grow-1 py-2 rounded-3" onClick={() => setShowAddModal(false)}>
+              <Button variant="primary" className="flex-fill">
                 Ajouter
               </Button>
             </div>
@@ -150,25 +211,13 @@ export default function SIMONInterface() {
         </Modal.Body>
       </Modal>
 
-
-
-
-      {/* ========================================= */}
-      {/* LOGIN SCREEN OVERLAY                       */}
-      {/* ========================================= */}
+      {/* ================= LOGIN ================= */}
       {showLoginModal && (
         <LoginScreen
           onLogin={handleLogin}
           onCancel={() => setShowLoginModal(false)}
         />
       )}
-
-      <style jsx global>{`
-                @keyframes spin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                }
-            `}</style>
     </div>
   );
 }
