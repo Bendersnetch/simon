@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Button, Modal, Form } from "react-bootstrap";
 import LoginScreen from "./LoginScreen";
@@ -31,7 +31,7 @@ export default function Page() {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  let searchTimer = null;
+  const searchTimerRef = useRef(null);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -118,16 +118,26 @@ export default function Page() {
               value={searchQuery}
               onChange={(e) => {
                 const value = e.target.value;
+                console.log('📝 Saisie:', value);
                 setSearchQuery(value);
 
-                // Annuler le timer précédent
-                if (searchTimer) {
-                  clearTimeout(searchTimer);
+                // Nettoyer l'état précédent immédiatement
+                setSuggestions([]);
+                setShowSuggestions(false);
+                setIsLoadingSuggestions(false);
+
+                // Annuler le timer précédent pour éviter les requêtes multiples
+                if (searchTimerRef.current) {
+                  clearTimeout(searchTimerRef.current);
+                  searchTimerRef.current = null; // Reset pour être sûr
+                  console.log('⏹️ Timer annulé, nouvelle saisie détectée');
                 }
 
-                // Si plus de 3 caractères, lancer un timer de 1 seconde
+                // Si plus de 3 caractères, lancer un timer de 2 secondes
                 if (value.length > 3) {
-                  searchTimer = setTimeout(async () => {
+                  searchTimerRef.current = setTimeout(async () => {
+                    console.log('🔍 Lancement de la recherche pour:', value);
+                    setShowSuggestions(true); // Afficher le dropdown immédiatement
                     setIsLoadingSuggestions(true);
                     try {
                       const res = await fetch(
@@ -136,10 +146,11 @@ export default function Page() {
                         )}&limit=5`
                       );
                       const data = await res.json();
+                      console.log('✅ Recherche terminée, résultats:', data.length);
                       setSuggestions(data);
-                      setShowSuggestions(true);
+                      // showSuggestions est déjà true
                     } catch (error) {
-                      console.error(error);
+                      console.error('❌ Erreur recherche:', error);
                       setSuggestions([]);
                       setShowSuggestions(false);
                     } finally {
@@ -154,9 +165,9 @@ export default function Page() {
               }}
               onBlur={() => {
                 // Annuler le timer si on perd le focus
-                if (searchTimer) {
-                  clearTimeout(searchTimer);
-                  searchTimer = null;
+                if (searchTimerRef.current) {
+                  clearTimeout(searchTimerRef.current);
+                  searchTimerRef.current = null;
                 }
                 setShowSuggestions(false);
                 setSuggestions([]);
@@ -167,15 +178,17 @@ export default function Page() {
                   e.preventDefault();
                   if (!searchQuery) return;
 
-                  // Annuler le timer de recherche automatique
-                  if (searchTimer) {
-                    clearTimeout(searchTimer);
-                    searchTimer = null;
-                  }
-
+                  // Fermer immédiatement le dropdown
                   setShowSuggestions(false);
                   setSuggestions([]);
                   setIsLoadingSuggestions(false);
+
+                  // Annuler le timer de recherche automatique
+                  if (searchTimerRef.current) {
+                    clearTimeout(searchTimerRef.current);
+                    searchTimerRef.current = null;
+                  }
+
                   setIsSearching(true);
                   try {
                     const res = await fetch(
@@ -197,9 +210,9 @@ export default function Page() {
                   }
                 } else if (e.key === "Escape") {
                   // Annuler le timer aussi en cas d'échappement
-                  if (searchTimer) {
-                    clearTimeout(searchTimer);
-                    searchTimer = null;
+                  if (searchTimerRef.current) {
+                    clearTimeout(searchTimerRef.current);
+                    searchTimerRef.current = null;
                   }
                   setShowSuggestions(false);
                   setSuggestions([]);
@@ -211,7 +224,7 @@ export default function Page() {
         </div>
 
         {/* Dropdown des suggestions */}
-        {(showSuggestions && suggestions.length > 0) || isLoadingSuggestions ? (
+        {showSuggestions ? (
           <div
             className="position-absolute bg-white border rounded-4 shadow-sm mt-1"
             style={{
