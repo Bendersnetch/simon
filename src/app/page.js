@@ -30,6 +30,8 @@ export default function Page() {
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  let searchTimer = null;
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -114,40 +116,66 @@ export default function Page() {
               className="form-control border-0 p-0 shadow-none"
               placeholder="Rechercher un lieu, une adresse…"
               value={searchQuery}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const value = e.target.value;
                 setSearchQuery(value);
+
+                // Annuler le timer précédent
+                if (searchTimer) {
+                  clearTimeout(searchTimer);
+                }
+
+                // Si plus de 3 caractères, lancer un timer de 1 seconde
                 if (value.length > 3) {
-                  try {
-                    const res = await fetch(
-                      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                        value
-                      )}&limit=5`
-                    );
-                    const data = await res.json();
-                    setSuggestions(data);
-                    setShowSuggestions(true);
-                  } catch (error) {
-                    console.error(error);
-                    setSuggestions([]);
-                    setShowSuggestions(false);
-                  }
+                  searchTimer = setTimeout(async () => {
+                    setIsLoadingSuggestions(true);
+                    try {
+                      const res = await fetch(
+                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                          value
+                        )}&limit=5`
+                      );
+                      const data = await res.json();
+                      setSuggestions(data);
+                      setShowSuggestions(true);
+                    } catch (error) {
+                      console.error(error);
+                      setSuggestions([]);
+                      setShowSuggestions(false);
+                    } finally {
+                      setIsLoadingSuggestions(false);
+                    }
+                  }, 1000);
                 } else {
                   setSuggestions([]);
                   setShowSuggestions(false);
+                  setIsLoadingSuggestions(false);
                 }
               }}
               onBlur={() => {
-                // Plus de délai, on cache immédiatement
+                // Annuler le timer si on perd le focus
+                if (searchTimer) {
+                  clearTimeout(searchTimer);
+                  searchTimer = null;
+                }
                 setShowSuggestions(false);
                 setSuggestions([]);
+                setIsLoadingSuggestions(false);
               }}
               onKeyDown={async (e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
                   if (!searchQuery) return;
+
+                  // Annuler le timer de recherche automatique
+                  if (searchTimer) {
+                    clearTimeout(searchTimer);
+                    searchTimer = null;
+                  }
+
                   setShowSuggestions(false);
                   setSuggestions([]);
+                  setIsLoadingSuggestions(false);
                   setIsSearching(true);
                   try {
                     const res = await fetch(
@@ -168,8 +196,14 @@ export default function Page() {
                     setIsSearching(false);
                   }
                 } else if (e.key === "Escape") {
+                  // Annuler le timer aussi en cas d'échappement
+                  if (searchTimer) {
+                    clearTimeout(searchTimer);
+                    searchTimer = null;
+                  }
                   setShowSuggestions(false);
                   setSuggestions([]);
+                  setIsLoadingSuggestions(false);
                 }
               }}
             />
@@ -177,7 +211,7 @@ export default function Page() {
         </div>
 
         {/* Dropdown des suggestions */}
-        {showSuggestions && suggestions.length > 0 && (
+        {(showSuggestions && suggestions.length > 0) || isLoadingSuggestions ? (
           <div
             className="position-absolute bg-white border rounded-4 shadow-sm mt-1"
             style={{
@@ -189,26 +223,35 @@ export default function Page() {
               zIndex: 10
             }}
           >
-            {suggestions.map((suggestion, index) => (
-              <div
-                key={index}
-                className="px-3 py-2 cursor-pointer hover-bg-light"
-                style={{ cursor: 'pointer' }}
-                onMouseDown={() => {
-                  setSearchQuery(suggestion.display_name);
-                  setMapCenter([parseFloat(suggestion.lat), parseFloat(suggestion.lon)]);
-                  setShowSuggestions(false);
-                  setSuggestions([]);
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-              >
-                <div className="fw-semibold">{suggestion.display_name.split(',')[0]}</div>
-                <div className="small text-muted">{suggestion.display_name}</div>
+            {isLoadingSuggestions ? (
+              <div className="px-3 py-3 text-center text-muted">
+                <div className="spinner-border spinner-border-sm me-2" role="status">
+                  <span className="visually-hidden">Chargement...</span>
+                </div>
+                Recherche de villes...
               </div>
-            ))}
+            ) : (
+              suggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-2 cursor-pointer hover-bg-light"
+                  style={{ cursor: 'pointer' }}
+                  onMouseDown={() => {
+                    setSearchQuery(suggestion.display_name);
+                    setMapCenter([parseFloat(suggestion.lat), parseFloat(suggestion.lon)]);
+                    setShowSuggestions(false);
+                    setSuggestions([]);
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                >
+                  <div className="fw-semibold">{suggestion.display_name.split(',')[0]}</div>
+                  <div className="small text-muted">{suggestion.display_name}</div>
+                </div>
+              ))
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Actions */}
         {!isLoggedIn ? (
