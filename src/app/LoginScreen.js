@@ -74,7 +74,7 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
 
                     <div className="d-flex justify-content-between align-items-center mb-4">
                         <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium" onClick={onCancel}>Annuler</button>
-                        <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium">Mot de passe oublié ?</button>
+                        {/* <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium">Mot de passe oublié ?</button> */}
                     </div>
 
                     <button onClick={onLogin} className="btn btn-danger w-100 py-3 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none' }}>
@@ -188,7 +188,7 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                                 <input type="checkbox" className="form-check-input mt-0 border-slate-300" style={{ boxShadow: 'none' }} />
                                 <span>Se souvenir de moi</span>
                             </label>
-                            <button className="btn btn-link text-danger text-decoration-none p-0 small fw-bold">Mot de passe oublié ?</button>
+                            {/* <button className="btn btn-link text-danger text-decoration-none p-0 small fw-bold">Mot de passe oublié ?</button> */}
                         </div>
 
                         <div className="text-center mb-5">
