@@ -4,6 +4,7 @@ import { CassandraService } from 'src/cassandra/cassandra.service';
 import { KafkaConsumerService } from './kafka-consumer.service';
 
 @Module({
-  providers: [KafkaConsumerService, IngestionBddService, CassandraService]
+  providers: [/*KafkaConsumerService, */CassandraService],
+  controllers: [IngestionBddService]
 })
 export class IngestionBddModule {}
