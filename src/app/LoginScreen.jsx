@@ -49,7 +49,7 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                     <circle cx="12" cy="7" r="4"></circle>
                                 </svg>
                             </div>
-                            <input type="text" placeholder="Identifiant" defaultValue="Admin_01" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                            <input type="text" placeholder="Identifiant" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
                         </div>
 
                         <div className="position-relative">
@@ -59,7 +59,7 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                             </div>
-                            <input type="password" placeholder="Mot de passe" defaultValue="•••••••••" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                            <input type="password" placeholder="Mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
                         </div>
                     </div>
 
@@ -131,7 +131,7 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                             <circle cx="12" cy="7" r="4"></circle>
                                         </svg>
                                     </div>
-                                    <input type="text" placeholder="Entrez votre identifiant" defaultValue="Admin_01" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                    <input type="text" placeholder="Entrez votre identifiant" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
                                 </div>
                             </div>
                             <div>
@@ -143,7 +143,7 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                         </svg>
                                     </div>
-                                    <input type="password" placeholder="Entrez votre mot de passe" defaultValue="•••••••••" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                    <input type="password" placeholder="Entrez votre mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
                                 </div>
                             </div>
                         </div>
