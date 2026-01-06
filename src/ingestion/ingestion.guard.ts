@@ -39,7 +39,10 @@ export class IngestionGuard implements CanActivate {
         } else if (error.response && error.response.status === 401) {
             throw new UnauthorizedException('Clé API invalide');
         } else {
-            throw new InternalServerErrorException('Impossible de vérifier le capteur pour le moment');
+            throw new InternalServerErrorException({
+              message: 'Impossible de vérifier le capteur pour le moment',
+              error: error?.message,
+            });
         }
     }
 

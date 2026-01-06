@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { IngestionService } from './ingestion.service';
 import { IngestionController } from './ingestion.controller';
-import { CassandraModule } from 'src/cassandra/cassandra.module';
 import { SensorClientModule } from 'src/sensor-client/sensor-client.module';
 import { IngestionGuard } from './ingestion.guard';
+import { KafkaModule } from 'src/kafka/kafka.module';
 
 @Module({
-  imports: [CassandraModule, SensorClientModule],
+  imports: [
+    SensorClientModule,
+    KafkaModule
+  ],
   providers: [IngestionService, IngestionGuard],
   controllers: [IngestionController]
 })
