@@ -54,30 +54,61 @@ function RecenterMap({ center }) {
   return null;
 }
 
-// ================= HEATMAP =================
-function HeatmapLayer({ points }) {
+// ================= POLLUTION HEATMAP =================
+function PollutionHeatmapLayer({ points }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map) return;
 
-    const heat = L.heatLayer(
-      points.map((p) => [p.lat, p.lng, p.aqi / 100]),
-      {
-        radius: 50,
-        blur: 80,
-        minOpacity: 0.35,
-        gradient: {
-          0.0: "#22c55e",
-          0.4: "#facc15",
-          0.6: "#fb923c",
-          0.8: "#ea580c",
-          1.0: "#b91c1c",
-        },
-      }
-    ).addTo(map);
+    const updateHeatmap = () => {
+      // Supprimer l'ancienne couche
+      map.eachLayer((layer) => {
+        if (layer instanceof L.HeatLayer) {
+          map.removeLayer(layer);
+        }
+      });
 
-    return () => map.removeLayer(heat);
+      const currentZoom = map.getZoom();
+      const centerLat = map.getCenter().lat;
+
+      // Calculer les mètres par pixel au zoom actuel
+      const metersPerPixel = 40075016.686 * Math.abs(Math.cos(centerLat * Math.PI / 180)) / Math.pow(2, currentZoom + 8);
+
+      // Rayon souhaité en mètres (500m)
+      const desiredRadiusMeters = 500;
+      const radiusPixels = desiredRadiusMeters / metersPerPixel;
+
+      const heat = L.heatLayer(
+        points.map((p) => [p.lat, p.lng, p.aqi / 100]),
+        {
+          radius: radiusPixels,
+          blur: 25,
+          minOpacity: 0.4,
+          gradient: {
+            0.0: "#22c55e",
+            0.4: "#facc15",
+            0.6: "#fb923c",
+            0.8: "#ea580c",
+            1.0: "#b91c1c",
+          },
+        }
+      ).addTo(map);
+    };
+
+    updateHeatmap();
+
+    // Mettre à jour quand le zoom change
+    map.on('zoomend', updateHeatmap);
+
+    return () => {
+      map.off('zoomend', updateHeatmap);
+      map.eachLayer((layer) => {
+        if (layer instanceof L.HeatLayer) {
+          map.removeLayer(layer);
+        }
+      });
+    };
   }, [map, points]);
 
   return null;
@@ -135,7 +166,7 @@ export default function Map({
       {/* Pollution */}
       {showPollution && (
         <>
-          <HeatmapLayer points={SENSORS_DATA} />
+          <PollutionHeatmapLayer points={SENSORS_DATA} />
           {SENSORS_DATA.map((sensor) => (
             <Marker key={sensor.id} position={[sensor.lat, sensor.lng]}>
               <Popup>

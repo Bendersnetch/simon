@@ -26,7 +26,7 @@ export default function Page() {
   const [showPollution, setShowPollution] = useState(true);
   const [showVegetation, setShowVegetation] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [mapCenter, setMapCenter] = useState([43.6045, 1.4442]); // Toulouse par défaut
+  const [mapCenter, setMapCenter] = useState([43.7102, 7.2620]); // Nice par défaut
 
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
