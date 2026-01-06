@@ -25,9 +25,10 @@ async function bootstrap() {
         brokers: ['kafka:9092'],
       },
       consumer: {
-        groupId: 'consumer4-server',
+        groupId: `consumer-debug-${Date.now()}`,
         allowAutoTopicCreation: true,
       },
+      subscribe: { topic: 'ping-topic', fromBeginning: true },
     },  
   });
   

@@ -1,5 +1,5 @@
 import { Controller } from '@nestjs/common';
-import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CassandraService } from 'src/cassandra/cassandra.service';
 import { Ingestion } from './ingestion.entity';
 
@@ -11,8 +11,16 @@ export class IngestionBddService {
 
     @MessagePattern('ping-topic')
     async testPing(@Payload() message: any) {
-        const payload = JSON.parse(message.value.toString());
-        console.log('Message ping reçu :', payload);
+        if (!message.value) return; // ignore les tombstones
+
+        const raw = message.value.toString();
+
+        try {
+          const payload = JSON.parse(raw);
+          console.log('Message ping reçu (MessagePattern):', payload);
+        } catch (err) {
+          console.warn('Message non-JSON reçu, ignoré (MessagePattern):', raw);
+        }
     }
 
     @MessagePattern('ingestion-topic')
