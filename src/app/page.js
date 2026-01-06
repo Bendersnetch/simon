@@ -21,6 +21,7 @@ export default function Page() {
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const [showPollution, setShowPollution] = useState(true);
   const [showVegetation, setShowVegetation] = useState(true);
@@ -277,10 +278,14 @@ export default function Page() {
               variant="light"
               className="rounded-circle shadow-sm"
               style={{ width: 48, height: 48 }}
-              onClick={() => setIsLoggedIn(false)}
+              onClick={() => setShowLogoutConfirm(true)}
               title="Déconnexion"
             >
-              ⎋
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
             </Button>
           </div>
         )}
@@ -369,7 +374,42 @@ export default function Page() {
         />
       )}
 
-      {/* ================= REGISTER ================= */}
+      {/* ================= LOGOUT CONFIRM ================= */}
+      <Modal show={showLogoutConfirm} onHide={() => setShowLogoutConfirm(false)} centered>
+        <Modal.Body className="p-5 text-center d-flex flex-column justify-content-center" style={{ minHeight: '350px' }}>
+          <div className="mb-3 text-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <h4 className="fw-bold mb-3">Déconnexion</h4>
+          <p className="text-muted mb-4">
+            Êtes-vous sûr de vouloir vous déconnecter ?
+          </p>
+
+          <div className="d-flex gap-2 justify-content-center">
+            <Button
+              variant="outline-secondary"
+              className="px-4"
+              onClick={() => setShowLogoutConfirm(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="danger"
+              className="px-4"
+              onClick={() => {
+                setIsLoggedIn(false);
+                setShowLogoutConfirm(false);
+              }}
+            >
+              Déconnexion
+            </Button>
+          </div>
+        </Modal.Body>
+      </Modal>
 
     </div>
   );

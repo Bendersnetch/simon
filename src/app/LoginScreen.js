@@ -108,38 +108,10 @@ export default function LoginScreen({ onLogin, onCancel }) {
                             </svg>
                         </div>
                         <h1 className="display-4 fw-bold text-slate-800 mb-2">SIMON</h1>
-                        <p className="h4 text-slate-500 fw-medium">Système de Monitoring Environnemental</p>
+                        <p className="h4 text-slate-500 fw-medium">Système Intelligent de Mesure et d’Optimisation de la Nature</p>
 
                         {/* Features */}
-                        <div className="mt-5 flex gap-8">
-                            <div className="flex items-center gap-3 text-slate-600">
-                                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
-                                        <path d="M17.5 19c0-1.7-1.3-3-3-3h-11c-1.7 0-3 1.3-3 3" />
-                                        <path d="M13 16V6" />
-                                    </svg>
-                                </div>
-                                <span className="font-medium">Pollution</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-slate-600">
-                                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500">
-                                        <path d="M12 2v20" />
-                                        <path d="M2 12a10 10 0 0 1 10-10" />
-                                    </svg>
-                                </div>
-                                <span className="font-medium">Végétation</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-slate-600">
-                                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <path d="M12 6v6l4 2" />
-                                    </svg>
-                                </div>
-                                <span className="font-medium">Temps réel</span>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
 
