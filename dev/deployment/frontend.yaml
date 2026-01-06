@@ -5,7 +5,7 @@ metadata:
   labels:
     app: frontend
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
@@ -16,11 +16,19 @@ spec:
     spec:
       containers:
       - name: frontend-container
-        image: localhost:5000/frontend:latest
+        image: 127.0.0.1:5000/frontend:latest
         imagePullPolicy: Always
 
         ports:
         - containerPort: 80
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
 
         env:
         - name: NODE_ENV

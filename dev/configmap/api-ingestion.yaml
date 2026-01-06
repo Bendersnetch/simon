@@ -9,3 +9,7 @@ data:
   DB_PASSWORD: "root"
   DB_DATABASE: "projet_simon"
   PORT: "3001"
+  KAFKA_BROKER: "kafka:9092"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  CAPTEUR_SERVICE_BASE_URL: "http://api-capteur-service:3000/api/v1"

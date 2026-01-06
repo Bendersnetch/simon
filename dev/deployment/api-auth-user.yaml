@@ -5,7 +5,7 @@ metadata:
   labels:
     app: api-auth-user
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api-auth-user
@@ -27,13 +27,28 @@ spec:
             sleep 2
           done
           echo "Postgres is ready!"
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
       containers:
       - name: api-auth-user-container
-        image: localhost:5000/api-auth-user:latest
+        image: 127.0.0.1:5000/api-auth-user:latest
         imagePullPolicy: Always
 
         ports:
         - containerPort: 3002
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
 
         env:
         - name: NODE_ENV

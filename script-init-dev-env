@@ -11,6 +11,84 @@ echo "======================================"
 echo "Installation de l'environnement de développement Simon"
 echo "======================================"
 echo ""
+echo "Ce script installe Docker, Minikube, kubectl, Skaffold et configure"
+echo "le registry Docker local pour le développement."
+echo ""
+echo "IMPORTANT : Exécutez ce script depuis un dossier vide ou un nouveau WSL."
+echo "Les dépôts Git seront clonés automatiquement dans la structure suivante :"
+echo "  ~/simon-dev/"
+echo "    ├── infra/     (configurations Kubernetes)"
+echo "    ├── APIs/      (microservices)"
+echo "    └── simon/     (frontend)"
+echo ""
+read -p "Continuer l'installation ? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Installation annulée."
+    exit 0
+fi
+echo ""
+
+# Créer le dossier de travail
+WORK_DIR="$HOME/simon-dev"
+echo "Création du dossier de travail : $WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# Cloner les dépôts Git en premier
+echo ""
+echo "======================================"
+echo "Clonage des dépôts Git"
+echo "======================================"
+echo ""
+
+if [ ! -d "infra" ]; then
+    echo "Clonage du dépôt infra..."
+    git clone https://iut-git.unice.fr/simon/infra || {
+        echo "ERREUR: Impossible de cloner le dépôt infra"
+        exit 1
+    }
+else
+    echo "✓ Dépôt infra déjà présent"
+fi
+
+if [ ! -d "simon" ]; then
+    echo "Clonage du frontend (simon)..."
+    git clone https://iut-git.unice.fr/simon/simon || {
+        echo "ERREUR: Impossible de cloner le dépôt simon"
+        exit 1
+    }
+else
+    echo "✓ Frontend déjà présent"
+fi
+
+# Cloner les APIs
+mkdir -p APIs
+cd APIs
+
+APIS=("api-capteur" "api-ingestion" "api-auth-user" "api-gateway-client" "service-ingestion-bdd" "api-sensor-data")
+for api in "${APIS[@]}"; do
+    if [ ! -d "$api" ]; then
+        echo "Clonage de $api..."
+        git clone "https://iut-git.unice.fr/simon/services/$api" || {
+            echo "⚠ Warning: Impossible de cloner $api"
+        }
+    else
+        echo "✓ $api déjà présent"
+    fi
+done
+
+cd "$WORK_DIR"
+
+echo ""
+echo "✓ Tous les dépôts Git sont prêts"
+echo ""
+
+# Installation des outils système
+echo "======================================"
+echo "Installation des outils système"
+echo "======================================"
+echo ""
 
 sudo apt update
 
@@ -92,25 +170,15 @@ fi
 
 echo "Docker Engine local (WSL2) utilisé correctement."
 
-# configurer docker pour le registry local
-mkdir -p ~/.docker
-cat > ~/.docker/config.json << 'EOF'
-{
-  "auths": {
-    "localhost:5000": {}
-  }
-}
-EOF
-echo "Configuration Docker créée pour le registry local"
-
-# installer minikube
+# Installer minikube
+echo "Installation de Minikube..."
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
 rm minikube-linux-amd64
 
-# démarrer minikube avec docker driver et profil dev
+# Démarrer minikube avec docker driver et profil dev
 # Configuration optimisée pour WSL2 + Docker Engine
-echo "Démarrage de minikube (cela peut prendre quelques minutes)..."
+echo "Démarrage de Minikube (cela peut prendre quelques minutes)..."
 
 # S'assurer que minikube utilise Docker Engine local
 export DOCKER_HOST=unix:///var/run/docker.sock
@@ -118,12 +186,31 @@ export DOCKER_HOST=unix:///var/run/docker.sock
 minikube start -p dev \
   --driver=docker \
   --container-runtime=docker \
-  --cpus=2 \
-  --memory=3072 \
+  --cpus=4 \
+  --memory=8192 \
   --wait=all \
   --wait-timeout=10m
 
-echo "Minikube démarré avec Docker Engine local."
+echo "✓ Minikube démarré avec Docker Engine local"
+
+# Activer le registry Minikube
+echo "Activation du registry Minikube..."
+minikube addons enable registry -p dev
+sleep 5
+
+# Configurer le port-forward pour le registry
+echo "Configuration du port-forward pour le registry..."
+kubectl port-forward -n kube-system service/registry 5000:80 > /dev/null 2>&1 &
+echo $! > /tmp/registry-pf.pid
+sleep 3
+
+# Vérifier que le registry est accessible
+echo "Vérification de l'accès au registry..."
+if curl -s http://127.0.0.1:5000/v2/_catalog > /dev/null 2>&1; then
+    echo "✓ Registry Minikube accessible sur 127.0.0.1:5000"
+else
+    echo "⚠ Warning: Registry Minikube non accessible (peut prendre du temps au premier démarrage)"
+fi
 
 # installer kubectl
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -133,47 +220,63 @@ rm kubectl
 # mettre à jour le contexte kubectl pour le cluster dev
 minikube update-context -p dev
 
-# activer le registry addon de minikube sur le cluster dev
-minikube addons enable registry -p dev
-
-# configurer le port forwarding pour accéder à la registry depuis l'hôte
-kubectl port-forward --namespace kube-system service/registry 5000:80 > /dev/null 2>&1 &
-
 # installer skaffold
 curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64
 sudo install skaffold /usr/local/bin/
 rm skaffold
-
-# cloner le frontend client
-git clone https://iut-git.unice.fr/simon/simon
-
-# cloner les API
-mkdir -p APIs
-cd APIs
-git clone https://iut-git.unice.fr/simon/services/api-capteur
-git clone https://iut-git.unice.fr/simon/services/api-ingestion
-git clone https://iut-git.unice.fr/simon/services/api-auth-user
-git clone https://iut-git.unice.fr/simon/services/api-gateway-client
 
 echo ""
 echo "======================================"
 echo "Installation terminée avec succès !"
 echo "======================================"
 echo ""
+echo "Répertoire de travail : $WORK_DIR"
+echo ""
+echo "Infrastructure installée :"
+echo "  ✓ Docker Engine (WSL2)"
+echo "  ✓ Minikube (profil: dev)"
+echo "  ✓ Registry Minikube (127.0.0.1:5000 via kubectl port-forward)"
+echo "  ✓ kubectl"
+echo "  ✓ Skaffold"
+echo "  ✓ Tous les dépôts Git clonés dans $WORK_DIR"
+echo ""
+echo "Structure des dossiers :"
+echo "  $WORK_DIR/"
+echo "    ├── infra/     (configurations Kubernetes et scripts)"
+echo "    ├── APIs/      (6 microservices)"
+echo "    └── simon/     (frontend Next.js)"
+echo ""
 echo "Pour démarrer l'environnement de développement :"
-echo "  cd simon/infra/dev"
+echo "  cd $WORK_DIR/infra"
+echo "  ./start-dev.sh    # Démarre Docker, Registry et Minikube"
+echo "  cd dev"
+echo "  skaffold dev"
+echo ""
+echo "Ou directement avec Skaffold (si l'environnement est déjà démarré) :"
+echo "  cd $WORK_DIR/infra/dev"
 echo "  skaffold dev"
 echo ""
 echo "Services qui seront accessibles :"
-echo "  - Frontend:        http://localhost:8080"
-echo "  - API Capteur:     http://localhost:3000"
-echo "  - API Ingestion:   http://localhost:3001"
-echo "  - API Auth User:   http://localhost:3002"
-echo "  - API Gateway:     http://localhost:3003"
-echo "  - PostgreSQL:      localhost:5432"
+echo "  - Frontend:               http://localhost:8080"
+echo "  - API Capteur:            http://localhost:3000"
+echo "  - API Ingestion:          http://localhost:3001"
+echo "  - API Auth User:          http://localhost:3002"
+echo "  - API Gateway:            http://localhost:3003"
+echo "  - Service Ingestion BDD:  http://localhost:3004"
+echo "  - API Sensor Data:        http://localhost:3006"
+echo "  - PostgreSQL:             localhost:5432"
+echo "  - Kafka:                  localhost:9092"
+echo "  - Cassandra:              localhost:9042"
+echo "  - Redis:                  localhost:6379"
+echo "  - Registry Minikube:      http://127.0.0.1:5000 (via kubectl port-forward)"
+echo ""
+echo "IMPORTANT: Le registry est accessible via kubectl port-forward."
+echo "Le port-forward a été démarré automatiquement (PID dans /tmp/registry-pf.pid)"
+echo "Pour redémarrer l'environnement, utilisez: cd $WORK_DIR/infra && ./start-dev.sh"
 echo ""
 echo "Commandes utiles :"
-echo "  minikube profile dev    # Activer le profil dev"
-echo "  kubectl get pods        # Voir les pods"
-echo "  minikube dashboard      # Interface web Kubernetes"
+echo "  minikube profile dev                     # Activer le profil dev"
+echo "  kubectl get pods -n kube-system          # Voir les pods système"
+echo "  minikube dashboard                       # Interface web Kubernetes"
+echo "  curl http://127.0.0.1:5000/v2/_catalog   # Voir les images du registry"
 echo ""

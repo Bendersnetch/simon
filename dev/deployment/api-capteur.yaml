@@ -6,7 +6,7 @@ metadata:
     app: api-capteur
 spec:
   # Nombre de copies de votre application (Pods)
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api-capteur
@@ -28,16 +28,31 @@ spec:
             sleep 2
           done
           echo "Postgres is ready!"
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
       containers:
       - name: api-capteur-container
         # Image built by Skaffold from the custom build command
-        image: localhost:5000/api-capteur:latest 
-        
+        image: 127.0.0.1:5000/api-capteur:latest
+
         # Force Kubernetes à retélécharger l'image si vous utilisez le tag 'latest'
-        imagePullPolicy: Always 
-        
+        imagePullPolicy: Always
+
         ports:
         - containerPort: 3000 # Doit matcher le EXPOSE 3000 du Dockerfile
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
         
         # Variables d'environnement
         env:

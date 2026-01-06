@@ -13,6 +13,8 @@ spec:
       labels:
         app: postgis
     spec:
+      securityContext:
+        fsGroup: 999
       containers:
       - name: postgis
         # Image communautaire officielle avec PostGIS pré-installé
@@ -21,6 +23,13 @@ spec:
         ports:
         - containerPort: 5432
           name: postgres
+        resources:
+          requests:
+            memory: "192Mi"
+            cpu: "100m"
+          limits:
+            memory: "384Mi"
+            cpu: "300m"
         env:
         - name: POSTGRES_DB
           value: "mabasegeo"

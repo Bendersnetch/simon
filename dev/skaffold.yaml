@@ -7,8 +7,9 @@ metadata:
 build:
   local:
     push: true
+    useBuildkit: true
   artifacts:
-    - image: localhost:5000/api-capteur
+    - image: 127.0.0.1:5000/api-capteur
       context: ../../APIs/api-capteur
       docker:
         dockerfile: Dockerfile
@@ -21,7 +22,7 @@ build:
           - src: 'package.json'
             dest: /app/package.json
 
-    - image: localhost:5000/api-ingestion
+    - image: 127.0.0.1:5000/api-ingestion
       context: ../../APIs/api-ingestion
       docker:
         dockerfile: Dockerfile
@@ -34,7 +35,7 @@ build:
           - src: 'package.json'
             dest: /app/package.json
 
-    - image: localhost:5000/api-auth-user
+    - image: 127.0.0.1:5000/api-auth-user
       context: ../../APIs/api-auth-user
       docker:
         dockerfile: Dockerfile
@@ -47,7 +48,7 @@ build:
           - src: 'package.json'
             dest: /app/package.json
 
-    - image: localhost:5000/api-gateway-client
+    - image: 127.0.0.1:5000/api-gateway-client
       context: ../../APIs/api-gateway-client
       docker:
         dockerfile: Dockerfile
@@ -60,10 +61,48 @@ build:
           - src: 'package.json'
             dest: /app/package.json
 
-    - image: localhost:5000/frontend
+    - image: 127.0.0.1:5000/frontend
       context: ../../simon
       docker:
         dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*'
+            dest: /app
+          - src: 'app/**/*'
+            dest: /app
+          - src: 'components/**/*'
+            dest: /app
+          - src: 'public/**/*'
+            dest: /app/public
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/service-ingestion-bdd
+      context: ../../APIs/service-ingestion-bdd
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/api-sensor-data
+      context: ../../APIs/api-sensor-data
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
 
 manifests:
   rawYaml:
@@ -102,3 +141,30 @@ portForward:
     resourceName: postgis
     port: 5432
     localPort: 5432
+  - resourceType: service
+    resourceName: service-ingestion-bdd-service
+    port: 3004
+    localPort: 3004
+  - resourceType: service
+    resourceName: api-sensor-data-service
+    port: 3006
+    localPort: 3006
+  - resourceType: service
+    resourceName: kafka
+    port: 9092
+    localPort: 9092
+  - resourceType: service
+    resourceName: zookeeper
+    port: 2181
+    localPort: 2181
+  - resourceType: service
+    resourceName: redis
+    port: 6379
+    localPort: 6379
+  - resourceType: service
+    resourceName: cassandra
+    port: 9042
+    localPort: 9042
+
+# Registry local accessible via hostname '127.0.0.1:5000' depuis le réseau Minikube
+# Le conteneur registry est connecté au même réseau Docker que Minikube
