@@ -105,7 +105,7 @@ export default function Page() {
         {/* Barre de recherche - cachée sur mobile, visible sur desktop */}
         <div className="flex-grow-1 d-none d-md-flex justify-content-center">
           <div
-            className="bg-white rounded-4 shadow-sm px-3 py-2 d-flex align-items-center gap-2"
+            className="bg-white rounded-4 shadow-sm px-3 py-2 d-flex align-items-center gap-2 position-relative"
             style={{ maxWidth: 420, width: "100%" }}
           >
             <svg
@@ -232,9 +232,67 @@ export default function Page() {
           </div>
         </div>
 
+        {/* Dropdown suggestions desktop */}
+        {showSuggestions && (suggestions.length > 0 || isLoadingSuggestions) && (
+          <div
+            className="position-absolute bg-white border rounded-3 shadow-sm mt-1"
+            style={{
+              top: '100%',
+              left: '30%',
+              width: '40%',
+              zIndex: 10,
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}
+          >
+            {isLoadingSuggestions ? (
+              <div className="d-flex align-items-center justify-content-center p-3">
+                <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
+                  <span className="visually-hidden">Chargement...</span>
+                </div>
+                <small className="text-muted">Recherche en cours...</small>
+              </div>
+            ) : (
+              suggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-2 hover-bg-light cursor-pointer border-bottom"
+                  style={{ cursor: 'pointer' }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setSearchQuery(suggestion.display_name);
+                    setShowSuggestions(false);
+                    setSuggestions([]);
+                    setIsLoadingSuggestions(false);
+                    // Annuler le timer
+                    if (searchTimerRef.current) {
+                      clearTimeout(searchTimerRef.current);
+                      searchTimerRef.current = null;
+                    }
+                    // Centrer la carte
+                    setMapCenter([
+                      parseFloat(suggestion.lat),
+                      parseFloat(suggestion.lon),
+                    ]);
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f8f9fa';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div className="fw-semibold small">{suggestion.display_name.split(',')[0]}</div>
+                  <div className="text-muted small">{suggestion.display_name.split(',').slice(1).join(',')}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* Barre de recherche mobile - visible seulement sur mobile */}
         <div className="flex-grow-1 d-md-none">
-          <div className="bg-white rounded-3 shadow-sm px-2 py-1 d-flex align-items-center gap-2">
+          <div className="bg-white rounded-3 shadow-sm px-2 py-1 d-flex align-items-center gap-2 position-relative">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -341,6 +399,63 @@ export default function Page() {
             />
           </div>
         </div>
+
+        {/* Dropdown suggestions mobile */}
+        {showSuggestions && (suggestions.length > 0 || isLoadingSuggestions) && (
+          <div
+            className="position-absolute bg-white border rounded-3 shadow-sm mt-1 d-md-none"
+            style={{
+              top: '100%',
+              width: '100%',
+              zIndex: 10,
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}
+          >
+            {isLoadingSuggestions ? (
+              <div className="d-flex align-items-center justify-content-center p-3">
+                <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
+                  <span className="visually-hidden">Chargement...</span>
+                </div>
+                <small className="text-muted">Recherche en cours...</small>
+              </div>
+            ) : (
+              suggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className="px-3 py-2 hover-bg-light cursor-pointer border-bottom"
+                  style={{ cursor: 'pointer' }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setSearchQuery(suggestion.display_name);
+                    setShowSuggestions(false);
+                    setSuggestions([]);
+                    setIsLoadingSuggestions(false);
+                    // Annuler le timer
+                    if (searchTimerRef.current) {
+                      clearTimeout(searchTimerRef.current);
+                      searchTimerRef.current = null;
+                    }
+                    // Centrer la carte
+                    setMapCenter([
+                      parseFloat(suggestion.lat),
+                      parseFloat(suggestion.lon),
+                    ]);
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#f8f9fa';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div className="fw-semibold small">{suggestion.display_name.split(',')[0]}</div>
+                  <div className="text-muted small">{suggestion.display_name.split(',').slice(1).join(',')}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         {!isLoggedIn ? (
