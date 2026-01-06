@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
+export default function LoginScreen({ onLogin, onCancel }) {
     return (
         <div className="login-screen-container position-fixed top-0 start-0 w-100 h-100 bg-white" style={{ zIndex: 2000 }}>
 
@@ -63,14 +63,7 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                         </div>
                     </div>
 
-                    <div className="text-center mb-3">
-                        <p className="text-slate-600 small mb-0">
-                            Vous n'avez pas de compte ?{' '}
-                            <button onClick={onSwitchToRegister} className="btn btn-link text-danger text-decoration-none p-0 fw-bold">
-                                Inscrivez-vous !
-                            </button>
-                        </p>
-                    </div>
+
 
                     <div className="d-flex justify-content-between align-items-center mb-4">
                         <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium" onClick={onCancel}>Annuler</button>
@@ -191,14 +184,7 @@ export default function LoginScreen({ onLogin, onCancel, onSwitchToRegister }) {
                             {/* <button className="btn btn-link text-danger text-decoration-none p-0 small fw-bold">Mot de passe oublié ?</button> */}
                         </div>
 
-                        <div className="text-center mb-5">
-                            <p className="text-slate-600 small mb-0">
-                                Vous n'avez pas de compte ?{' '}
-                                <button onClick={onSwitchToRegister} className="btn btn-link text-danger text-decoration-none p-0 fw-bold">
-                                    Inscrivez-vous !
-                                </button>
-                            </p>
-                        </div>
+
 
                         <div className="d-flex gap-3 mb-5">
                             <button onClick={onCancel} className="btn btn-light border w-50 py-3 rounded-3 fw-bold text-slate-600">Annuler</button>
