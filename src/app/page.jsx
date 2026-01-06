@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Button, Modal, Form } from "react-bootstrap";
 import LoginScreen from "./LoginScreen";
+import UserManagementScreen from "./UserManagementScreen";
+import { FaUsers } from "react-icons/fa";
 
 
 // Map (Leaflet) – désactivé côté SSR
@@ -21,6 +23,7 @@ export default function Page() {
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const [showPollution, setShowPollution] = useState(true);
@@ -384,12 +387,20 @@ export default function Page() {
             </Button>
             <Button
               variant="primary"
+              className="rounded-circle shadow-sm"
+              onClick={() => setShowUserManagement(true)}
+            >
+              <FaUsers />
+            </Button>
+            <Button
+              variant="primary"
               className="rounded-4 px-3 py-1 px-md-4 py-md-2 shadow-sm fs-7 fs-md-6"
               onClick={() => setShowAddModal(true)}
             >
               <span className="d-none d-sm-inline">+ Nouveau module</span>
               <span className="d-sm-none">+</span>
             </Button>
+
             <Button
               variant="light"
               className="rounded-circle shadow-sm"
@@ -586,6 +597,13 @@ export default function Page() {
           </div>
         </Modal.Body>
       </Modal>
+
+      {/* ================= USER MANAGEMENT ================= */}
+      {showUserManagement && (
+        <UserManagementScreen
+          onBack={() => setShowUserManagement(false)}
+        />
+      )}
 
     </div>
   );
