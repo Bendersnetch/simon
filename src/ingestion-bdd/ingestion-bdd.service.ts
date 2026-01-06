@@ -1,15 +1,18 @@
 import { Controller } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { CassandraService } from 'src/cassandra/cassandra.service';
 import { Ingestion } from './ingestion.entity';
 
 @Controller()
 export class IngestionBddService {
-    constructor(private readonly cassandraService: CassandraService) {}
+    constructor(private readonly cassandraService: CassandraService) {
+        console.log("bdd fait");
+    }
 
     @MessagePattern('ping-topic')
     async testPing(@Payload() message: any) {
-        console.log("Message ping reçu");
+        const payload = JSON.parse(message.value.toString());
+        console.log('Message ping reçu :', payload);
     }
 
     @MessagePattern('ingestion-topic')
