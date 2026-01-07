@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Button, Modal, Form } from "react-bootstrap";
+import { Button, Modal, Form, Alert } from "react-bootstrap";
 import LoginScreen from "./LoginScreen";
 import UserManagementScreen from "./UserManagementScreen";
 import { FaUsers } from "react-icons/fa";
 
+import { SENSORS_DATA as DEFAULT_SENSORS } from "./components/Map";
 
 // Map (Leaflet) – désactivé côté SSR
 const Map = dynamic(() => import("./components/Map"), {
@@ -22,14 +23,14 @@ export default function Page() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const [showPollution, setShowPollution] = useState(true);
   const [showVegetation, setShowVegetation] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [mapCenter, setMapCenter] = useState([43.7102, 7.2620]); // Nice par défaut
+  const [mapCenter, setMapCenter] = useState([43.7102, 7.262]); // Nice par défaut
+  const [currentViewCenter, setCurrentViewCenter] = useState([43.7102, 7.262]);
 
   const [isMobile, setIsMobile] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -39,15 +40,57 @@ export default function Page() {
   const [showMobileLayers, setShowMobileLayers] = useState(false);
   const searchTimerRef = useRef(null);
 
+  // ================== SENSORS STATE (pour gérer modify/disable/add) ==================
+  const [sensors, setSensors] = useState(DEFAULT_SENSORS);
+  const [disabledSensorIds, setDisabledSensorIds] = useState([]);
+
+  // ================== MODALE APPAREILS ==================
+  const [showDevicesModal, setShowDevicesModal] = useState(false);
+  const [deviceSerial, setDeviceSerial] = useState("");
+  const [deviceError, setDeviceError] = useState("");
+  const [selectedSensor, setSelectedSensor] = useState(null);
+  const [deviceMode, setDeviceMode] = useState("none"); // "none" | "view" | "edit"
+
+  // Edition
+  const [editLat, setEditLat] = useState("");
+  const [editLng, setEditLng] = useState("");
+  const [editAqi, setEditAqi] = useState("");
+
+  // Ajout (ancien formulaire "Nouveau module")
+  const [addId, setAddId] = useState("");
+  const [addLat, setAddLat] = useState("");
+  const [addLng, setAddLng] = useState("");
+  const [addAqi, setAddAqi] = useState("50"); // par défaut
+
+  // Confirm désactivation
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
+  const [activateSerial, setActivateSerial] = useState("");
+
+  const deviceSerialNormalized = useMemo(
+    () => deviceSerial.trim().toUpperCase(),
+    [deviceSerial]
+  );
+
+  const findSensorById = (id) => {
+    const target = (id || "").trim().toUpperCase();
+    if (!target) return null;
+    return sensors.find((s) => (s.id || "").toUpperCase() === target) || null;
+  };
+
+  const isSensorDisabled = useMemo(() => {
+    if (!selectedSensor) return false;
+    return disabledSensorIds.includes(selectedSensor.id);
+  }, [selectedSensor, disabledSensorIds]);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
 
     checkMobile();
-    window.addEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
 
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const handleLogin = (e) => {
@@ -56,11 +99,157 @@ export default function Page() {
     setShowLoginModal(false);
   };
 
+  const resetDevicesModal = () => {
+    setDeviceSerial("");
+    setDeviceError("");
+    setSelectedSensor(null);
+    setDeviceMode("none");
+    setEditLat("");
+    setEditLng("");
+    setEditAqi("");
+    setAddId("");
+    setAddLat("");
+    setAddLng("");
+    setAddAqi("50");
+    setShowDisableConfirm(false);
+    setActivateSerial("");
+  };
 
+  const loadSensorFromSerial = () => {
+    setDeviceError("");
+    const s = findSensorById(deviceSerialNormalized);
+    if (!s) {
+      setSelectedSensor(null);
+      setDeviceMode("none");
+      setDeviceError("Capteur introuvable. Vérifie le numéro de série.");
+      return null;
+    }
+    setSelectedSensor(s);
+    // Pré-remplir l'édition
+    setEditLat(String(s.lat));
+    setEditLng(String(s.lng));
+    setEditAqi(String(s.aqi));
+    return s;
+  };
 
+  const handleShowSensor = () => {
+    const s = loadSensorFromSerial();
+    if (!s) return;
 
+    // Si désactivé: on bloque l'affichage
+    if (disabledSensorIds.includes(s.id)) {
+      setDeviceMode("none");
+      setDeviceError("Ce capteur est désactivé. Active-le pour pouvoir l’afficher.");
+      return;
+    }
 
+    setDeviceMode("view");
+    // Centrer la carte sur le capteur
+    setMapCenter([parseFloat(s.lat), parseFloat(s.lng)]);
+  };
 
+  const handleSaveEdits = () => {
+    setDeviceError("");
+    const s = loadSensorFromSerial();
+    if (!s) return;
+
+    const lat = Number(editLat);
+    const lng = Number(editLng);
+    const aqi = Number(editAqi);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(aqi)) {
+      setDeviceError("Latitude/Longitude/AQI doivent être des nombres valides.");
+      return;
+    }
+
+    setSensors((prev) =>
+      prev.map((x) =>
+        x.id === s.id ? { ...x, lat, lng, aqi } : x
+      )
+    );
+
+    // Recentrer pour feedback immédiat
+    setMapCenter([lat, lng]);
+  };
+
+  const requestDisableSensor = () => {
+    setDeviceError("");
+    const s = loadSensorFromSerial();
+    if (!s) return;
+    setShowDisableConfirm(true);
+  };
+
+  const confirmDisableSensor = () => {
+    if (!selectedSensor) return;
+
+    setDisabledSensorIds((prev) => {
+      if (prev.includes(selectedSensor.id)) return prev;
+      return [...prev, selectedSensor.id];
+    });
+
+    setShowDisableConfirm(false);
+  };
+
+  const handleActivateSensor = () => {
+    setDeviceError("");
+    const id = (activateSerial || "").trim().toUpperCase();
+    if (!id) {
+      setDeviceError("Choisis un capteur à activer.");
+      return;
+    }
+    if (!disabledSensorIds.includes(id)) {
+      setDeviceError("Ce capteur n’est pas dans la liste des désactivés.");
+      return;
+    }
+
+    setDisabledSensorIds((prev) => prev.filter((x) => x !== id));
+    setActivateSerial("");
+  };
+
+  const handleAddSensor = () => {
+    setDeviceError("");
+
+    const id = addId.trim().toUpperCase();
+    const lat = Number(addLat);
+    const lng = Number(addLng);
+    const aqi = Number(addAqi);
+
+    if (!id) {
+      setDeviceError("ID capteur obligatoire.");
+      return;
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(aqi)) {
+      setDeviceError("Latitude/Longitude/AQI doivent être des nombres valides.");
+      return;
+    }
+    const exists = sensors.some((s) => (s.id || "").toUpperCase() === id);
+    if (exists) {
+      setDeviceError("Un capteur avec cet ID existe déjà.");
+      return;
+    }
+
+    setSensors((prev) => [
+      ...prev,
+      { id, lat, lng, aqi, label: id, desc: "Ajouté manuellement" },
+    ]);
+
+    // Au cas où il était désactivé avant
+    setDisabledSensorIds((prev) => prev.filter((x) => x !== id));
+
+    setMapCenter([lat, lng]);
+    setAddId("");
+    setAddLat("");
+    setAddLng("");
+    setAddAqi("50");
+  };
+
+  const canUseSerialActions = useMemo(() => {
+    const s = findSensorById(deviceSerialNormalized);
+    if (!s) return false;
+    // Si déjà désactivé, on bloque "Afficher" et "Modifier" (mais pas le reste)
+    if (disabledSensorIds.includes(s.id)) return false;
+    return true;
+  }, [deviceSerialNormalized, sensors, disabledSensorIds]);
 
   return (
     <div className="position-relative w-100 min-vh-100 overflow-hidden bg-light text-dark">
@@ -68,14 +257,21 @@ export default function Page() {
       <div
         className="position-absolute top-0 start-0 w-100 h-100 z-0"
         style={{
-          top: isMobile ? '60px' : '0',
-          height: isMobile ? 'calc(100vh - 60px)' : '100vh'
+          top: isMobile ? "60px" : "0",
+          height: isMobile ? "calc(100vh - 60px)" : "100vh",
         }}
       >
         <Map
           showPollution={showPollution}
           showVegetation={showVegetation}
           center={mapCenter}
+          sensors={sensors}
+          disabledSensorIds={disabledSensorIds}
+          onViewChange={({ center }) => {
+            if (Array.isArray(center) && center.length === 2) {
+              setCurrentViewCenter(center);
+            }
+          }}
         />
       </div>
 
@@ -83,9 +279,9 @@ export default function Page() {
         <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 z-2">
           <div className="text-center">
             <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Chargement...</span>
+              <span className="visually-hidden">Chargement.</span>
             </div>
-            <p className="mt-2">Recherche en cours...</p>
+            <p className="mt-2">Recherche en cours.</p>
           </div>
         </div>
       )}
@@ -130,198 +326,15 @@ export default function Page() {
               value={searchQuery}
               onChange={(e) => {
                 const value = e.target.value;
-                console.log('📝 Saisie:', value);
                 setSearchQuery(value);
 
-                // Nettoyer l'état précédent immédiatement
                 setSuggestions([]);
                 setShowSuggestions(false);
                 setIsLoadingSuggestions(false);
 
-                // Annuler le timer précédent pour éviter les requêtes multiples
-                if (searchTimerRef.current) {
-                  clearTimeout(searchTimerRef.current);
-                  searchTimerRef.current = null; // Reset pour être sûr
-                  console.log('⏹️ Timer annulé, nouvelle saisie détectée');
-                }
-
-                // Si plus de 3 caractères, lancer un timer de 2 secondes
-                if (value.length > 3) {
-                  searchTimerRef.current = setTimeout(async () => {
-                    console.log('🔍 Lancement de la recherche pour:', value);
-                    setShowSuggestions(true); // Afficher le dropdown immédiatement
-                    setIsLoadingSuggestions(true);
-                    try {
-                      const res = await fetch(
-                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                          value
-                        )}&limit=5`
-                      );
-                      const data = await res.json();
-                      console.log('✅ Recherche terminée, résultats:', data.length);
-                      setSuggestions(data);
-                      // showSuggestions est déjà true
-                    } catch (error) {
-                      console.error('❌ Erreur recherche:', error);
-                      setSuggestions([]);
-                      setShowSuggestions(false);
-                    } finally {
-                      setIsLoadingSuggestions(false);
-                    }
-                  }, 1000);
-                } else {
-                  setSuggestions([]);
-                  setShowSuggestions(false);
-                  setIsLoadingSuggestions(false);
-                }
-              }}
-              onBlur={() => {
-                // Annuler le timer si on perd le focus
                 if (searchTimerRef.current) {
                   clearTimeout(searchTimerRef.current);
                   searchTimerRef.current = null;
-                }
-                setShowSuggestions(false);
-                setSuggestions([]);
-                setIsLoadingSuggestions(false);
-              }}
-              onKeyDown={async (e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (!searchQuery) return;
-
-                  // Fermer immédiatement le dropdown
-                  setShowSuggestions(false);
-                  setSuggestions([]);
-                  setIsLoadingSuggestions(false);
-
-                  // Annuler le timer de recherche automatique
-                  if (searchTimerRef.current) {
-                    clearTimeout(searchTimerRef.current);
-                    searchTimerRef.current = null;
-                  }
-
-                  setIsSearching(true);
-                  try {
-                    const res = await fetch(
-                      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                        searchQuery
-                      )}`
-                    );
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                      setMapCenter([
-                        parseFloat(data[0].lat),
-                        parseFloat(data[0].lon),
-                      ]);
-                    }
-                  } catch (error) {
-                    console.error(error);
-                  } finally {
-                    setIsSearching(false);
-                  }
-                } else if (e.key === "Escape") {
-                  // Annuler le timer aussi en cas d'échappement
-                  if (searchTimerRef.current) {
-                    clearTimeout(searchTimerRef.current);
-                    searchTimerRef.current = null;
-                  }
-                  setShowSuggestions(false);
-                  setSuggestions([]);
-                  setIsLoadingSuggestions(false);
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Dropdown suggestions desktop */}
-        {showSuggestions && (suggestions.length > 0 || isLoadingSuggestions) && (
-          <div
-            className="position-absolute bg-white border rounded-3 shadow-sm mt-1"
-            style={{
-              top: '100%',
-              left: '30%',
-              width: '40%',
-              zIndex: 10,
-              maxHeight: '200px',
-              overflowY: 'auto'
-            }}
-          >
-            {isLoadingSuggestions ? (
-              <div className="d-flex align-items-center justify-content-center p-3">
-                <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
-                  <span className="visually-hidden">Chargement...</span>
-                </div>
-                <small className="text-muted">Recherche en cours...</small>
-              </div>
-            ) : (
-              suggestions.map((suggestion, index) => (
-                <div
-                  key={index}
-                  className="px-3 py-2 hover-bg-light cursor-pointer border-bottom"
-                  style={{ cursor: 'pointer' }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setSearchQuery(suggestion.display_name);
-                    setShowSuggestions(false);
-                    setSuggestions([]);
-                    setIsLoadingSuggestions(false);
-                    // Annuler le timer
-                    if (searchTimerRef.current) {
-                      clearTimeout(searchTimerRef.current);
-                      searchTimerRef.current = null;
-                    }
-                    // Centrer la carte
-                    setMapCenter([
-                      parseFloat(suggestion.lat),
-                      parseFloat(suggestion.lon),
-                    ]);
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f8f9fa';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <div className="fw-semibold small">{suggestion.display_name.split(',')[0]}</div>
-                  <div className="text-muted small">{suggestion.display_name.split(',').slice(1).join(',')}</div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Barre de recherche mobile - visible seulement sur mobile */}
-        <div className="flex-grow-1 d-md-none">
-          <div className="bg-white rounded-3 shadow-sm px-2 py-1 d-flex align-items-center gap-2 position-relative">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              className="form-control border-0 p-0 shadow-none fs-7"
-              placeholder="Rechercher..."
-              value={searchQuery}
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearchQuery(value);
-                setSuggestions([]);
-                setShowSuggestions(false);
-                setIsLoadingSuggestions(false);
-
-                if (searchTimerRef.current) {
-                  clearTimeout(searchTimerRef.current);
                 }
 
                 if (value.length > 3) {
@@ -337,7 +350,7 @@ export default function Page() {
                       const data = await res.json();
                       setSuggestions(data);
                     } catch (error) {
-                      console.error('❌ Erreur recherche:', error);
+                      console.error("❌ Erreur recherche:", error);
                       setSuggestions([]);
                       setShowSuggestions(false);
                     } finally {
@@ -353,6 +366,7 @@ export default function Page() {
               onBlur={() => {
                 if (searchTimerRef.current) {
                   clearTimeout(searchTimerRef.current);
+                  searchTimerRef.current = null;
                 }
                 setShowSuggestions(false);
                 setSuggestions([]);
@@ -369,6 +383,7 @@ export default function Page() {
 
                   if (searchTimerRef.current) {
                     clearTimeout(searchTimerRef.current);
+                    searchTimerRef.current = null;
                   }
 
                   setIsSearching(true);
@@ -393,6 +408,7 @@ export default function Page() {
                 } else if (e.key === "Escape") {
                   if (searchTimerRef.current) {
                     clearTimeout(searchTimerRef.current);
+                    searchTimerRef.current = null;
                   }
                   setShowSuggestions(false);
                   setSuggestions([]);
@@ -402,63 +418,6 @@ export default function Page() {
             />
           </div>
         </div>
-
-        {/* Dropdown suggestions mobile */}
-        {showSuggestions && (suggestions.length > 0 || isLoadingSuggestions) && (
-          <div
-            className="position-absolute bg-white border rounded-3 shadow-sm mt-1 d-md-none"
-            style={{
-              top: '100%',
-              width: '100%',
-              zIndex: 10,
-              maxHeight: '200px',
-              overflowY: 'auto'
-            }}
-          >
-            {isLoadingSuggestions ? (
-              <div className="d-flex align-items-center justify-content-center p-3">
-                <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
-                  <span className="visually-hidden">Chargement...</span>
-                </div>
-                <small className="text-muted">Recherche en cours...</small>
-              </div>
-            ) : (
-              suggestions.map((suggestion, index) => (
-                <div
-                  key={index}
-                  className="px-3 py-2 hover-bg-light cursor-pointer border-bottom"
-                  style={{ cursor: 'pointer' }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setSearchQuery(suggestion.display_name);
-                    setShowSuggestions(false);
-                    setSuggestions([]);
-                    setIsLoadingSuggestions(false);
-                    // Annuler le timer
-                    if (searchTimerRef.current) {
-                      clearTimeout(searchTimerRef.current);
-                      searchTimerRef.current = null;
-                    }
-                    // Centrer la carte
-                    setMapCenter([
-                      parseFloat(suggestion.lat),
-                      parseFloat(suggestion.lon),
-                    ]);
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f8f9fa';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <div className="fw-semibold small">{suggestion.display_name.split(',')[0]}</div>
-                  <div className="text-muted small">{suggestion.display_name.split(',').slice(1).join(',')}</div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
 
         {/* Actions */}
         {!isLoggedIn ? (
@@ -470,7 +429,17 @@ export default function Page() {
               style={{ width: 36, height: 36 }}
               onClick={() => setShowMobileLayers(!showMobileLayers)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="3" y1="12" x2="21" y2="12"></line>
                 <line x1="3" y1="6" x2="21" y2="6"></line>
                 <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -487,19 +456,30 @@ export default function Page() {
           </div>
         ) : (
           <div className="d-flex align-items-center gap-2 gap-md-3 flex-shrink-0">
-            {/* Bouton hamburger pour mobile */}
+ {/* Bouton hamburger pour mobile */}
             <Button
               variant="light"
               className="rounded-circle shadow-sm d-md-none"
               style={{ width: 36, height: 36 }}
               onClick={() => setShowMobileLayers(!showMobileLayers)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="3" y1="12" x2="21" y2="12"></line>
                 <line x1="3" y1="6" x2="21" y2="6"></line>
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
             </Button>
+
             <Button
               variant="primary"
               className="rounded-circle shadow-sm"
@@ -507,13 +487,21 @@ export default function Page() {
             >
               <FaUsers />
             </Button>
+
+            {/* ======= BOUTON APPAREILS (remplace + Nouveau module) ======= */}
             <Button
               variant="primary"
               className="rounded-4 px-3 py-1 px-md-4 py-md-2 shadow-sm fs-7 fs-md-6"
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                setShowDevicesModal(true);
+                setDeviceError("");
+                // Pré-remplir l’ajout avec la position actuelle de la carte
+                setAddLat((prev) => (prev ? prev : String(currentViewCenter[0])));
+                setAddLng((prev) => (prev ? prev : String(currentViewCenter[1])));
+              }}
             >
-              <span className="d-none d-sm-inline">+ Nouveau module</span>
-              <span className="d-sm-none">+</span>
+              <span className="d-none d-sm-inline">Appareils</span>
+              <span className="d-sm-none">App.</span>
             </Button>
 
             <Button
@@ -523,7 +511,17 @@ export default function Page() {
               onClick={() => setShowLogoutConfirm(true)}
               title="Déconnexion"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -534,7 +532,6 @@ export default function Page() {
       </header>
 
       {/* ================= PANNEAU CALQUES ================= */}
-      {/* Version desktop */}
       <aside
         className="position-absolute z-3 d-none d-md-block"
         style={{ top: 96, left: 24, width: 260 }}
@@ -573,25 +570,22 @@ export default function Page() {
       {/* Version mobile - Bottom sheet */}
       {showMobileLayers && (
         <>
-          {/* Overlay pour fermer */}
           <div
             className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 z-2 d-md-none"
             onClick={() => setShowMobileLayers(false)}
           />
-          {/* Bottom sheet */}
           <div
             className="position-fixed bottom-0 start-0 w-100 bg-white rounded-top-4 shadow-lg z-3 d-md-none"
             style={{
-              maxHeight: '60vh',
-              transform: showMobileLayers ? 'translateY(0)' : 'translateY(100%)',
-              transition: 'transform 0.3s ease-out'
+              maxHeight: "60vh",
+              transform: showMobileLayers ? "translateY(0)" : "translateY(100%)",
+              transition: "transform 0.3s ease-out",
             }}
           >
-            {/* Poignée pour fermer */}
             <div className="d-flex justify-content-center py-2">
               <div
                 className="bg-secondary rounded-pill"
-                style={{ width: 40, height: 4, cursor: 'pointer' }}
+                style={{ width: 40, height: 4, cursor: "pointer" }}
                 onClick={() => setShowMobileLayers(false)}
               />
             </div>
@@ -599,7 +593,6 @@ export default function Page() {
             <div className="px-3 pb-4">
               <p className="fw-bold small text-muted mb-3">CALQUES ACTIFS</p>
 
-              {/* Pollution */}
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div>
                   <div className="fw-semibold">Pollution (NO₂)</div>
@@ -612,7 +605,6 @@ export default function Page() {
                 />
               </div>
 
-              {/* Végétation */}
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <div className="fw-semibold">Zones végétales</div>
@@ -629,26 +621,197 @@ export default function Page() {
         </>
       )}
 
-      {/* ================= MODALE AJOUT MODULE ================= */}
-      <Modal show={showAddModal} onHide={() => setShowAddModal(false)} centered>
+      {/* ================= MODALE APPAREILS ================= */}
+      <Modal
+        show={showDevicesModal}
+        onHide={() => {
+          setShowDevicesModal(false);
+          resetDevicesModal();
+        }}
+        centered
+      >
         <Modal.Body className="p-3 p-md-4">
-          <h4 className="fw-bold fs-5 fs-md-4">Nouveau module</h4>
-          <p className="text-muted small mb-4">
-            Ajoutez un module sur la carte de surveillance.
+          <h4 className="fw-bold fs-5 fs-md-4">Appareils</h4>
+          <p className="text-muted small mb-3">
           </p>
+
+          {deviceError ? <Alert variant="danger">{deviceError}</Alert> : null}
 
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label className="fs-7 fs-md-6">ID capteur</Form.Label>
-              <Form.Control placeholder="SENS-202X" className="fs-7 fs-md-6" />
+              <Form.Label className="fs-7 fs-md-6">Numéro de série</Form.Label>
+              <Form.Control
+                placeholder="SENS-001"
+                className="fs-7 fs-md-6"
+                value={deviceSerial}
+                onChange={(e) => {
+                  setDeviceSerial(e.target.value);
+                  setDeviceError("");
+                  setSelectedSensor(null);
+                  setDeviceMode("none");
+                }}
+              />
             </Form.Group>
 
-            <div className="row g-2 mb-4">
-              <div className="col-6">
-                <Form.Control placeholder="Latitude" className="fs-7 fs-md-6" />
+            <div className="d-flex flex-column gap-2">
+              <Button
+                variant="outline-primary"
+                disabled={!deviceSerialNormalized || !canUseSerialActions}
+                onClick={handleShowSensor}
+              >
+                Afficher les informations
+              </Button>
+
+              <Button
+                variant="primary"
+                disabled={!deviceSerialNormalized || !canUseSerialActions}
+                onClick={() => {
+                  const s = loadSensorFromSerial();
+                  if (!s) return;
+                  if (disabledSensorIds.includes(s.id)) {
+                    setDeviceMode("none");
+                    setDeviceError("Ce capteur est désactivé. Active-le pour pouvoir le modifier.");
+                    return;
+                  }
+                  setDeviceMode("edit");
+                }}
+              >
+                Modifier les informations
+              </Button>
+
+              <Button
+                variant="danger"
+                disabled={!deviceSerialNormalized || !findSensorById(deviceSerialNormalized)}
+                onClick={requestDisableSensor}
+              >
+                Désactiver le capteur
+              </Button>
+            </div>
+
+            {/* Affichage infos (lat/lng/aqi) */}
+            {selectedSensor ? (
+              <div className="mt-4 p-3 border rounded-3 bg-light">
+                <div className="fw-semibold mb-2">
+                  Capteur: {selectedSensor.id}{" "}
+                  {disabledSensorIds.includes(selectedSensor.id) ? (
+                    <span className="badge text-bg-secondary ms-2">désactivé</span>
+                  ) : null}
+                </div>
+
+                {/* Affichage uniquement */}
+                {deviceMode === "view" ? (
+                  <div className="small">
+                    <div><b>Latitude:</b> {selectedSensor.lat}</div>
+                    <div><b>Longitude:</b> {selectedSensor.lng}</div>
+                    <div><b>AQI:</b> {selectedSensor.aqi}</div>
+                  </div>
+                ) : null}
+
+                {/* Edition uniquement */}
+                {deviceMode === "edit" ? (
+                  <>
+                    <div className="small mb-2">
+                      <div><b>Latitude:</b> {selectedSensor.lat}</div>
+                      <div><b>Longitude:</b> {selectedSensor.lng}</div>
+                      <div><b>AQI:</b> {selectedSensor.aqi}</div>
+                    </div>
+
+                    {disabledSensorIds.includes(selectedSensor.id) ? (
+                      <div className="small text-muted">
+                        Ce capteur est désactivé : active-le pour pouvoir le modifier.
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <div className="fw-semibold small mb-2">Modifier</div>
+                        <div className="row g-2">
+                          <div className="col-4">
+                            <Form.Control
+                              value={editLat}
+                              onChange={(e) => setEditLat(e.target.value)}
+                              placeholder="Latitude"
+                              className="fs-7 fs-md-6"
+                            />
+                          </div>
+                          <div className="col-4">
+                            <Form.Control
+                              value={editLng}
+                              onChange={(e) => setEditLng(e.target.value)}
+                              placeholder="Longitude"
+                              className="fs-7 fs-md-6"
+                            />
+                          </div>
+                          <div className="col-4">
+                            <Form.Control
+                              value={editAqi}
+                              onChange={(e) => setEditAqi(e.target.value)}
+                              placeholder="AQI"
+                              className="fs-7 fs-md-6"
+                            />
+                          </div>
+                        </div>
+                        <div className="d-flex gap-2 mt-2">
+                          <Button variant="success" onClick={handleSaveEdits}>
+                            Enregistrer
+                          </Button>
+                          <Button
+                            variant="outline-secondary"
+                            onClick={() => loadSensorFromSerial()}
+                          >
+                            Réinitialiser
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : null}
+
+                {deviceMode === "none" ? (
+                  <div className="small text-muted">Choisis “Afficher” ou “Modifier” pour voir les détails.</div>
+                ) : null}
               </div>
-              <div className="col-6">
-                <Form.Control placeholder="Longitude" className="fs-7 fs-md-6" />
+            ) : null}
+
+            <hr className="my-4" />
+
+            {/* Ajouter un capteur (comme avant) */}
+            <h5 className="fw-bold fs-6">Ajouter un capteur</h5>
+            <p className="text-muted small">
+            </p>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fs-7 fs-md-6">ID capteur</Form.Label>
+              <Form.Control
+                placeholder="SENS-202X"
+                className="fs-7 fs-md-6"
+                value={addId}
+                onChange={(e) => setAddId(e.target.value)}
+              />
+            </Form.Group>
+
+            <div className="row g-2 mb-3">
+              <div className="col-4">
+                <Form.Control
+                  placeholder="Latitude"
+                  className="fs-7 fs-md-6"
+                  value={addLat}
+                  onChange={(e) => setAddLat(e.target.value)}
+                />
+              </div>
+              <div className="col-4">
+                <Form.Control
+                  placeholder="Longitude"
+                  className="fs-7 fs-md-6"
+                  value={addLng}
+                  onChange={(e) => setAddLng(e.target.value)}
+                />
+              </div>
+              <div className="col-4">
+                <Form.Control
+                  placeholder="AQI"
+                  className="fs-7 fs-md-6"
+                  value={addAqi}
+                  onChange={(e) => setAddAqi(e.target.value)}
+                />
               </div>
             </div>
 
@@ -656,15 +819,50 @@ export default function Page() {
               <Button
                 variant="outline-secondary"
                 className="flex-fill fs-7 fs-md-6"
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowDevicesModal(false);
+                  resetDevicesModal();
+                }}
               >
-                Annuler
+                Fermer
               </Button>
-              <Button variant="primary" className="flex-fill fs-7 fs-md-6">
+              <Button
+                variant="primary"
+                className="flex-fill fs-7 fs-md-6"
+                onClick={handleAddSensor}
+              >
                 Ajouter
               </Button>
             </div>
           </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* ================= CONFIRM DESACTIVATION ================= */}
+      <Modal
+        show={showDisableConfirm}
+        onHide={() => setShowDisableConfirm(false)}
+        centered
+      >
+        <Modal.Body className="p-4 text-center">
+          <h4 className="fw-bold mb-3">Désactiver le capteur</h4>
+          <p className="text-muted mb-4">
+            Êtes-vous sûr de vouloir désactiver{" "}
+            <b>{selectedSensor?.id}</b> ?
+            <br />
+            Il ne sera plus affiché sur la carte.
+          </p>
+          <div className="d-flex gap-2 justify-content-center">
+            <Button
+              variant="outline-secondary"
+              onClick={() => setShowDisableConfirm(false)}
+            >
+              Annuler
+            </Button>
+            <Button variant="danger" onClick={confirmDisableSensor}>
+              Oui, désactiver
+            </Button>
+          </div>
         </Modal.Body>
       </Modal>
 
@@ -677,10 +875,27 @@ export default function Page() {
       )}
 
       {/* ================= LOGOUT CONFIRM ================= */}
-      <Modal show={showLogoutConfirm} onHide={() => setShowLogoutConfirm(false)} centered>
-        <Modal.Body className="p-4 p-md-5 text-center d-flex flex-column justify-content-center" style={{ minHeight: '300px' }}>
+      <Modal
+        show={showLogoutConfirm}
+        onHide={() => setShowLogoutConfirm(false)}
+        centered
+      >
+        <Modal.Body
+          className="p-4 p-md-5 text-center d-flex flex-column justify-content-center"
+          style={{ minHeight: "300px" }}
+        >
           <div className="mb-3 text-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="8" x2="12" y2="12"></line>
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -715,11 +930,8 @@ export default function Page() {
 
       {/* ================= USER MANAGEMENT ================= */}
       {showUserManagement && (
-        <UserManagementScreen
-          onBack={() => setShowUserManagement(false)}
-        />
+        <UserManagementScreen onBack={() => setShowUserManagement(false)} />
       )}
-
     </div>
   );
 }
