@@ -36,7 +36,6 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
-
   private getScopesForRole(role: string): string[] {
     const map = {
       user: ['read:own_profile', 'update:own_profile'],
@@ -47,5 +46,9 @@ export class UserService {
 
   async updateLastConnection(userId: number, date: Date): Promise<void> {
     await this.userRepository.update(userId, { lastConnection: date });
+  }
+
+  async getAll() {
+    return this.userRepository.getAll();
   }
 }
