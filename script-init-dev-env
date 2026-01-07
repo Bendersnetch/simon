@@ -7,21 +7,32 @@ if [ "$EUID" -eq 0 ]; then
    exit 1
 fi
 
+
 echo "======================================"
-echo "Installation de l'environnement de développement Simon"
+echo "AVERTISSEMENT : Script d'Initialisation"
+echo "======================================"
+echo "Ce script est destiné à une PREMIÈRE installation uniquement."
+echo "Il va créer un dossier '~/simon-dev' et y cloner tous les dépôts requis."
+echo ""
+echo "NE L'EXÉCUTEZ PAS si vous avez déjà une structure de projet."
+echo "Si votre environnement est déjà prêt, utilisez './start-dev.sh' pour le démarrer."
 echo "======================================"
 echo ""
-echo "Ce script installe Docker, Minikube, kubectl, Skaffold et configure"
-echo "le registry Docker local pour le développement."
-echo ""
-echo "IMPORTANT : Exécutez ce script depuis un dossier vide ou un nouveau WSL."
-echo "Les dépôts Git seront clonés automatiquement dans la structure suivante :"
-echo "  ~/simon-dev/"
-echo "    ├── infra/     (configurations Kubernetes)"
-echo "    ├── APIs/      (microservices)"
-echo "    └── simon/     (frontend)"
-echo ""
-read -p "Continuer l'installation ? (y/n) " -n 1 -r
+
+# Vérification de sécurité pour s'assurer que nous ne sommes pas dans un projet existant
+# Obtient le répertoire où se trouve le script pour faire une vérification relative
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ -d "$SCRIPT_DIR/../simon" ] || [ -d "$SCRIPT_DIR/../APIs" ]; then
+    echo "ERREUR: Le script a détecté une structure de projet existante."
+    echo "Les dossiers 'simon' ou 'APIs' sont présents à côté du dossier 'infra'."
+    echo "L'exécution est annulée pour éviter de dupliquer le projet."
+    echo ""
+    echo "Pour démarrer votre environnement, exécutez la commande suivante depuis le dossier 'infra' :"
+    echo "  ./start-dev.sh"
+    exit 1
+fi
+
+read -p "Voulez-vous vraiment continuer et créer un NOUVEL environnement ? (y/n) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Installation annulée."

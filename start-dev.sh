@@ -21,11 +21,13 @@ echo "✓ Docker OK"
 MINIKUBE_STATUS=$(minikube status -p dev -f '{{.Host}}' 2>/dev/null || echo "Stopped")
 if [ "$MINIKUBE_STATUS" != "Running" ]; then
     echo "Démarrage de Minikube avec configuration optimisée..."
+    # Attendre que le cluster soit prêt pour éviter les erreurs en chaîne
     minikube start -p dev \
         --driver=docker \
         --container-runtime=docker \
         --cpus=4 \
-        --memory=8192
+        --memory=8192 \
+        --wait=all --wait-timeout=5m
 else
     echo "✓ Minikube déjà démarré"
 fi
@@ -34,7 +36,7 @@ fi
 echo "Configuration du registry Minikube..."
 REGISTRY_STATUS=$(minikube addons list -p dev | grep "^| registry " | awk '{print $5}')
 if [ "$REGISTRY_STATUS" != "enabled" ]; then
-    echo "Activation du registry Minikube (port 32800)..."
+    echo "Activation du registry Minikube..."
     minikube addons enable registry -p dev
     sleep 5
 else
@@ -72,7 +74,7 @@ echo "======================================"
 echo "Environnement prêt !"
 echo "======================================"
 echo ""
-echo "Pour lancer l'application :"
-echo "  cd infra/dev"
+echo "Pour lancer l'application (depuis le dossier 'infra'):"
+echo "  cd dev"
 echo "  skaffold dev"
 echo ""
