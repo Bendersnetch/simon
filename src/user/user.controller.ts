@@ -6,7 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get()
+  @Get("/get-all")
   async getAll() {
     return this.userService.getAll();
   }
