@@ -39,7 +39,6 @@ export default function Page() {
   const searchTimerRef = useRef(null);
 
   // ================== SENSORS STATE (pour gérer modify/disable/add) ==================
-  const [sensors, setSensors] = useState(DEFAULT_SENSORS);
   const [disabledSensorIds, setDisabledSensorIds] = useState([]);
 
   // ================== MODALE APPAREILS ==================
@@ -454,7 +453,7 @@ export default function Page() {
           </div>
         ) : (
           <div className="d-flex align-items-center gap-2 gap-md-3 flex-shrink-0">
- {/* Bouton hamburger pour mobile */}
+            {/* Bouton hamburger pour mobile */}
             <Button
               variant="light"
               className="rounded-circle shadow-sm d-md-none"
