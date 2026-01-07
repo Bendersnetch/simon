@@ -7,8 +7,6 @@ import LoginScreen from "./LoginScreen";
 import UserManagementScreen from "./UserManagementScreen";
 import { FaUsers } from "react-icons/fa";
 
-import { SENSORS_DATA as DEFAULT_SENSORS } from "./components/Map";
-
 // Map (Leaflet) – désactivé côté SSR
 const Map = dynamic(() => import("./components/Map"), {
   ssr: false,
