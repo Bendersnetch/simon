@@ -63,3 +63,8 @@ spec:
             configMapKeyRef:
               name: api-gateway-client-config
               key: AUTH_USER_SERVICE_URL
+        - name: SENSOR_DATA_SERVICE_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: api-gateway-client-config
+              key: SENSOR_DATA_SERVICE_BASE_URL
