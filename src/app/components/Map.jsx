@@ -2,12 +2,15 @@
 
 import {
   MapContainer,
-  TileLayer,  ZoomControl,
+  TileLayer,
+  ZoomControl,
   useMap,
   useMapEvents,
   GeoJSON,
   CircleMarker,
   Tooltip,
+  Marker,
+  Popup,
 } from "react-leaflet";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
@@ -325,7 +328,7 @@ export default function Map({
   center,
   showPollution,
   showVegetation,
-  sensors = SENSORS_DATA,
+  sensors = FALLBACK_SENSORS_DATA,
   disabledSensorIds = [],
   onViewChange,
 }) {
@@ -402,7 +405,6 @@ export default function Map({
       {showHeat && (
         <>
           <SensorGradientLayer points={activeSensors} />
-          <PollutionHeatmapLayer points={sensorsData} />
           {sensorsData.map((sensor) => (
             <Marker key={sensor.id} position={[sensor.lat, sensor.lng]}>
               <Popup>
