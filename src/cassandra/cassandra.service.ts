@@ -9,7 +9,7 @@ export class CassandraService implements OnModuleInit, OnModuleDestroy {
     async onModuleInit() {
         this.client = new Client({
             contactPoints: ['cassandra'],
-            localDataCenter: 'datacenter1',
+            localDataCenter: 'DC1',
             keyspace: 'capteur_data',
         });
         await this.client.connect();
