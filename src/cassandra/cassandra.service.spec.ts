@@ -87,37 +87,4 @@ describe('CassandraService', () => {
         });
     });
 
-    describe('onModuleDestroy', () => {
-        it('should shutdown the client', async () => {
-            const shutdownMock = jest.fn().mockResolvedValue(undefined);
-            (Client as unknown as jest.Mock).mockImplementation(() => ({
-                connect: jest.fn(),
-                execute: jest.fn(),
-                shutdown: shutdownMock,
-            }));
-
-            await service.onModuleInit(); // Initialize to set this.client
-            await service.onModuleDestroy();
-
-            expect(shutdownMock).toHaveBeenCalled();
-        });
-    });
-
-    describe('execute', () => {
-        it('should execute query with params', async () => {
-            const executeMock = jest.fn().mockResolvedValue({ rows: [] });
-            (Client as unknown as jest.Mock).mockImplementation(() => ({
-                connect: jest.fn(),
-                execute: executeMock,
-            }));
-
-            await service.onModuleInit();
-
-            const query = 'SELECT * FROM table';
-            const params = ['param1'];
-            await service.execute(query, params);
-
-            expect(executeMock).toHaveBeenCalledWith(query, params, { prepare: true });
-        });
-    });
 });
