@@ -69,9 +69,8 @@ export default function Page() {
   );
 
   const findSensorById = (id) => {
-    const target = (id || "").trim().toUpperCase();
-    if (!target) return null;
-    return sensors.find((s) => (s.id || "").toUpperCase() === target) || null;
+    // Les données des capteurs sont maintenant gérées par le composant Map
+    return null;
   };
 
   const isSensorDisabled = useMemo(() => {
@@ -159,11 +158,8 @@ export default function Page() {
       return;
     }
 
-    setSensors((prev) =>
-      prev.map((x) =>
-        x.id === s.id ? { ...x, lat, lng, aqi } : x
-      )
-    );
+    // Note: Les données des capteurs sont maintenant gérées par l'API
+    // TODO: Appeler l'API pour modifier le capteur
 
     // Recentrer pour feedback immédiat
     setMapCenter([lat, lng]);
@@ -219,16 +215,14 @@ export default function Page() {
       setDeviceError("Latitude/Longitude/AQI doivent être des nombres valides.");
       return;
     }
-    const exists = sensors.some((s) => (s.id || "").toUpperCase() === id);
+    const exists = false; // Vérification désactivée - données gérées par le composant Map
     if (exists) {
       setDeviceError("Un capteur avec cet ID existe déjà.");
       return;
     }
 
-    setSensors((prev) => [
-      ...prev,
-      { id, lat, lng, aqi, label: id, desc: "Ajouté manuellement" },
-    ]);
+    // Note: Les données des capteurs sont maintenant gérées par l'API
+    // TODO: Appeler l'API pour ajouter le capteur
 
     // Au cas où il était désactivé avant
     setDisabledSensorIds((prev) => prev.filter((x) => x !== id));
@@ -246,7 +240,7 @@ export default function Page() {
     // Si déjà désactivé, on bloque "Afficher" et "Modifier" (mais pas le reste)
     if (disabledSensorIds.includes(s.id)) return false;
     return true;
-  }, [deviceSerialNormalized, sensors, disabledSensorIds]);
+  }, [deviceSerialNormalized, disabledSensorIds]);
 
   return (
     <div className="position-relative w-100 min-vh-100 overflow-hidden bg-light text-dark">
@@ -262,7 +256,7 @@ export default function Page() {
           showPollution={showPollution}
           showVegetation={showVegetation}
           center={mapCenter}
-          sensors={sensors}
+
           disabledSensorIds={disabledSensorIds}
           onViewChange={({ center }) => {
             if (Array.isArray(center) && center.length === 2) {
