@@ -3,12 +3,12 @@ import { IngestionService } from './ingestion.service';
 import { IngestionController } from './ingestion.controller';
 import { SensorClientModule } from 'src/sensor-client/sensor-client.module';
 import { IngestionGuard } from './ingestion.guard';
-import { KafkaModule } from 'src/kafka/kafka.module';
+import { RedisModule } from 'src/redis/redis.module';
 
 @Module({
   imports: [
     SensorClientModule,
-    KafkaModule
+    RedisModule
   ],
   providers: [IngestionService, IngestionGuard],
   controllers: [IngestionController]

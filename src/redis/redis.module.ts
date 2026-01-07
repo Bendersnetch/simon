@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-redis-store';
 import { createClient } from 'redis';
+import { RedisProducerService } from './redis.service';
 
 @Module({
   imports: [
@@ -20,5 +21,7 @@ import { createClient } from 'redis';
       isGlobal: true,
     }),
   ],
+  providers: [RedisProducerService],
+  exports: [RedisProducerService],
 })
 export class RedisModule {}
