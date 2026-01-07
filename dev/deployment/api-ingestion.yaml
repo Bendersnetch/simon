@@ -34,25 +34,7 @@ spec:
           limits:
             memory: "32Mi"
             cpu: "50m"
-      - name: wait-for-kafka
-        image: busybox:1.36
-        command:
-        - sh
-        - -c
-        - |
-          echo "Waiting for kafka to be ready..."
-          until nc -z -w 2 kafka.default.svc.cluster.local 9092 2>/dev/null; do
-            echo "Kafka not ready, waiting..."
-            sleep 2
-          done
-          echo "Kafka is ready!"
-        resources:
-          requests:
-            memory: "16Mi"
-            cpu: "10m"
-          limits:
-            memory: "32Mi"
-            cpu: "50m"
+
       - name: wait-for-redis
         image: busybox:1.36
         command:
