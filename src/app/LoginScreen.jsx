@@ -1,6 +1,29 @@
-import React from 'react';
+"use client";
+
+import React, { useState } from 'react';
+import { loginUser } from './actions';
 
 export default function LoginScreen({ onLogin, onCancel }) {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleLoginClick = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+
+        const result = await loginUser(email, password);
+        setLoading(false);
+
+        if (result.success) {
+            onLogin(e);
+        } else {
+            setError(result.error);
+        }
+    };
+
     return (
         <div className="login-screen-container position-fixed top-0 start-0 w-100 h-100 bg-white" style={{ zIndex: 2000 }}>
 
@@ -42,6 +65,7 @@ export default function LoginScreen({ onLogin, onCancel }) {
                     </h2>
 
                     <div className="d-flex flex-column gap-3 mb-4">
+                        {error && <div className="alert alert-danger py-2 small">{error}</div>}
                         <div className="position-relative">
                             <div className="position-absolute top-50 start-0 translate-middle-y ms-3 text-slate-400">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +73,14 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                     <circle cx="12" cy="7" r="4"></circle>
                                 </svg>
                             </div>
-                            <input type="text" placeholder="Identifiant" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                            <input
+                                type="text"
+                                placeholder="Email"
+                                className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium"
+                                style={{ boxShadow: 'none' }}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                            />
                         </div>
 
                         <div className="position-relative">
@@ -59,7 +90,14 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                             </div>
-                            <input type="password" placeholder="Mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ boxShadow: 'none' }} />
+                            <input
+                                type="password"
+                                placeholder="Mot de passe"
+                                className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium"
+                                style={{ boxShadow: 'none' }}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
                         </div>
                     </div>
 
@@ -70,12 +108,14 @@ export default function LoginScreen({ onLogin, onCancel }) {
                         {/* <button className="btn btn-link text-slate-400 text-decoration-none p-0 small fw-medium">Mot de passe oublié ?</button> */}
                     </div>
 
-                    <button onClick={onLogin} className="btn btn-danger w-100 py-3 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none' }}>
-                        <span>Connexion</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                        </svg>
+                    <button onClick={handleLoginClick} disabled={loading} className="btn btn-danger w-100 py-3 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none' }}>
+                        {loading ? 'Connexion...' : <span>Connexion</span>}
+                        {!loading && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        )}
                     </button>
                 </div>
             </div>
@@ -122,8 +162,9 @@ export default function LoginScreen({ onLogin, onCancel }) {
                         <p className="text-slate-500 mb-5">Accédez à l'interface de gestion des capteurs</p>
 
                         <div className="d-flex flex-column gap-4 mb-5">
+                            {error && <div className="alert alert-danger py-2 small">{error}</div>}
                             <div>
-                                <label className="form-label small fw-bold text-slate-600">Identifiant</label>
+                                <label className="form-label small fw-bold text-slate-600">Email</label>
                                 <div className="position-relative">
                                     <div className="position-absolute top-50 start-0 translate-middle-y ms-3 text-slate-400">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -131,7 +172,14 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                             <circle cx="12" cy="7" r="4"></circle>
                                         </svg>
                                     </div>
-                                    <input type="text" placeholder="Entrez votre identifiant" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                    <input
+                                        type="email"
+                                        placeholder="Entrez votre email"
+                                        className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium"
+                                        style={{ fontSize: '1.1rem' }}
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                    />
                                 </div>
                             </div>
                             <div>
@@ -143,7 +191,14 @@ export default function LoginScreen({ onLogin, onCancel }) {
                                             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                         </svg>
                                     </div>
-                                    <input type="password" placeholder="Entrez votre mot de passe" className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium" style={{ fontSize: '1.1rem' }} />
+                                    <input
+                                        type="password"
+                                        placeholder="Entrez votre mot de passe"
+                                        className="form-control bg-slate-50 border-slate-200 text-slate-800 py-3 ps-5 rounded-3 fw-medium"
+                                        style={{ fontSize: '1.1rem' }}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -160,12 +215,14 @@ export default function LoginScreen({ onLogin, onCancel }) {
 
                         <div className="d-flex gap-3 mb-5">
                             <button onClick={onCancel} className="btn btn-light border w-50 py-3 rounded-3 fw-bold text-slate-600">Annuler</button>
-                            <button onClick={onLogin} className="btn btn-danger w-100 py-3 rounded-3 fw-bold shadow-lg d-flex align-items-center justify-content-center gap-3" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none', fontSize: '1.1rem' }}>
-                                <span>Se connecter</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                    <polyline points="12 5 19 12 12 19"></polyline>
-                                </svg>
+                            <button onClick={handleLoginClick} disabled={loading} className="btn btn-danger w-100 py-3 rounded-3 fw-bold shadow-lg d-flex align-items-center justify-content-center gap-3" style={{ background: 'linear-gradient(to right, #ef4444, #f43f5e)', border: 'none', fontSize: '1.1rem' }}>
+                                {loading ? 'Connexion...' : <span>Se connecter</span>}
+                                {!loading && (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        <polyline points="12 5 19 12 12 19"></polyline>
+                                    </svg>
+                                )}
                             </button>
                         </div>
 
