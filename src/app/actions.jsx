@@ -23,3 +23,26 @@ export async function loginUser(email, password) {
         return { success: false, error: error.message };
     }
 }
+
+export async function getSensorData() {
+    try {
+        const apiGatewayUrl = process.env.API_GATEWAY_URL;
+        const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-data-gateway/recent`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Failed to fetch sensor data');
+        }
+
+        const data = await response.json();
+        return { success: true, data };
+    } catch (error) {
+        console.error('Sensor data error:', error);
+        return { success: false, error: error.message };
+    }
+}

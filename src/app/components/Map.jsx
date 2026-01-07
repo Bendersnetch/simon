@@ -10,8 +10,9 @@ import {
   GeoJSON,
 } from "react-leaflet";
 import L from "leaflet";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "leaflet.heat";
+import { getSensorData } from "../actions";
 
 // ================= ICON FIX =================
 const iconUrl =
@@ -33,8 +34,8 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// ================= DATA =================
-const SENSORS_DATA = [
+// ================= FALLBACK DATA =================
+const FALLBACK_SENSORS_DATA = [
   { id: "SENS-001", lat: 43.696, lng: 7.265, aqi: 95, label: "Centre", desc: "Trafic saturé" },
   { id: "SENS-002", lat: 43.701, lng: 7.278, aqi: 55, label: "Vieux Nice", desc: "Zone piétonne" },
   { id: "SENS-003", lat: 43.715, lng: 7.268, aqi: 25, label: "Cimiez", desc: "Parc et jardins" },
@@ -145,6 +146,41 @@ export default function Map({
   showPollution,
   showVegetation,
 }) {
+  const [sensorsData, setSensorsData] = useState(FALLBACK_SENSORS_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchSensorData() {
+      try {
+        const result = await getSensorData();
+        if (result.success && result.data && result.data.length > 0) {
+          // Transformer les données de l'API au format attendu
+          const transformedData = result.data.map((item, index) => ({
+            id: item.capteur_id || `SENS-${index}`,
+            lat: item.latitude || item.lat,
+            lng: item.longitude || item.lng,
+            aqi: item.aqi || item.pm25 || 50,
+            label: item.label || item.capteur_id || `Capteur ${index + 1}`,
+            desc: item.description || item.desc || "Capteur actif",
+          }));
+          setSensorsData(transformedData);
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération des capteurs:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSensorData();
+
+    // Rafraîchir les données toutes les 30 secondes
+    const interval = setInterval(fetchSensorData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <MapContainer
       center={center || [43.695, 7.265]}
@@ -166,8 +202,8 @@ export default function Map({
       {/* Pollution */}
       {showPollution && (
         <>
-          <PollutionHeatmapLayer points={SENSORS_DATA} />
-          {SENSORS_DATA.map((sensor) => (
+          <PollutionHeatmapLayer points={sensorsData} />
+          {sensorsData.map((sensor) => (
             <Marker key={sensor.id} position={[sensor.lat, sensor.lng]}>
               <Popup>
                 <strong>{sensor.label}</strong>
