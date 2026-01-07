@@ -7,6 +7,6 @@ export class SensorDataGatewayController {
 
     @Get("recent")
     async getRecent() {
-        return this.sensorDataGatewayService.getrecent();
+        return this.sensorDataGatewayService.getRecent();
     }
 }

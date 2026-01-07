@@ -8,7 +8,7 @@ export class SensorDataGatewayService {
 
     private BASE_URL = process.env.SENSOR_DATA_SERVICE_BASE_URL ?? "http://localhost:3006/api/v1";
     
-    async getrecent() {
+    async getRecent() {
         const response$ = this.httpService.get(`${this.BASE_URL}/sensor-data/recent`);
         const response = await firstValueFrom(response$);
         return response.data;
