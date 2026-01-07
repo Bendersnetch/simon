@@ -11,6 +11,8 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
+import "leaflet.heat";
+import { getSensorData } from "../actions";
 
 const getAqiWeight = (aqi) => {
   // Même découpage que les pastilles (pour que la zone heatmap ait la même couleur)
@@ -43,53 +45,13 @@ const AQI_LEGEND = [
   { label: "200+", color: "#7f1d1d" },
 ];
 
-// ================= DATA (exportée pour l'UI "Appareils") =================
-export const SENSORS_DATA = [
-  { id: "SENS-001", lat: 43.707619, lng: 7.273178, aqi: 174, label: "Capteur 01", desc: "Mesure temps réel" },
-  { id: "SENS-002", lat: 43.708283, lng: 7.268245, aqi: 168, label: "Capteur 02", desc: "Mesure temps réel" },
-  { id: "SENS-003", lat: 43.716494, lng: 7.295333, aqi: 72, label: "Capteur 03", desc: "Mesure temps réel" },
-  { id: "SENS-004", lat: 43.70017, lng: 7.228614, aqi: 97, label: "Capteur 04", desc: "Mesure temps réel" },
-  { id: "SENS-005", lat: 43.719672, lng: 7.223979, aqi: 77, label: "Capteur 05", desc: "Mesure temps réel" },
-  { id: "SENS-006", lat: 43.733238, lng: 7.282123, aqi: 56, label: "Capteur 06", desc: "Mesure temps réel" },
-  { id: "SENS-007", lat: 43.711419, lng: 7.225657, aqi: 63, label: "Capteur 07", desc: "Mesure temps réel" },
-  { id: "SENS-008", lat: 43.697097, lng: 7.222858, aqi: 65, label: "Capteur 08", desc: "Mesure temps réel" },
-  { id: "SENS-009", lat: 43.707027, lng: 7.300031, aqi: 91, label: "Capteur 09", desc: "Mesure temps réel" },
-  { id: "SENS-010", lat: 43.717015, lng: 7.267478, aqi: 136, label: "Capteur 10", desc: "Mesure temps réel" },
-  { id: "SENS-011", lat: 43.707866, lng: 7.246425, aqi: 152, label: "Capteur 11", desc: "Mesure temps réel" },
-  { id: "SENS-012", lat: 43.734785, lng: 7.29982, aqi: 40, label: "Capteur 12", desc: "Mesure temps réel" },
-  { id: "SENS-013", lat: 43.700764, lng: 7.241818, aqi: 110, label: "Capteur 13", desc: "Mesure temps réel" },
-  { id: "SENS-014", lat: 43.70502, lng: 7.300425, aqi: 85, label: "Capteur 14", desc: "Mesure temps réel" },
-  { id: "SENS-015", lat: 43.732902, lng: 7.300494, aqi: 12, label: "Capteur 15", desc: "Mesure temps réel" },
-  { id: "SENS-016", lat: 43.695486, lng: 7.306476, aqi: 65, label: "Capteur 16", desc: "Mesure temps réel" },
-  { id: "SENS-017", lat: 43.734018, lng: 7.257755, aqi: 37, label: "Capteur 17", desc: "Mesure temps réel" },
-  { id: "SENS-018", lat: 43.716473, lng: 7.293959, aqi: 82, label: "Capteur 18", desc: "Mesure temps réel" },
-  { id: "SENS-019", lat: 43.733204, lng: 7.292014, aqi: 25, label: "Capteur 19", desc: "Mesure temps réel" },
-  { id: "SENS-020", lat: 43.697319, lng: 7.229599, aqi: 66, label: "Capteur 20", desc: "Mesure temps réel" },
-  { id: "SENS-021", lat: 43.724851, lng: 7.236879, aqi: 71, label: "Capteur 21", desc: "Mesure temps réel" },
-  { id: "SENS-022", lat: 43.707371, lng: 7.238115, aqi: 120, label: "Capteur 22", desc: "Mesure temps réel" },
-  { id: "SENS-023", lat: 43.695643, lng: 7.245631, aqi: 136, label: "Capteur 23", desc: "Mesure temps réel" },
-  { id: "SENS-024", lat: 43.725171, lng: 7.248894, aqi: 100, label: "Capteur 24", desc: "Mesure temps réel" },
-  { id: "SENS-025", lat: 43.695536, lng: 7.257456, aqi: 150, label: "Capteur 25", desc: "Mesure temps réel" },
-  { id: "SENS-026", lat: 43.717092, lng: 7.229532, aqi: 95, label: "Capteur 26", desc: "Mesure temps réel" },
-  { id: "SENS-027", lat: 43.695662, lng: 7.244536, aqi: 126, label: "Capteur 27", desc: "Mesure temps réel" },
-  { id: "SENS-028", lat: 43.701448, lng: 7.248151, aqi: 118, label: "Capteur 28", desc: "Mesure temps réel" },
-  { id: "SENS-029", lat: 43.697151, lng: 7.277122, aqi: 130, label: "Capteur 29", desc: "Mesure temps réel" },
-  { id: "SENS-030", lat: 43.70766, lng: 7.311118, aqi: 60, label: "Capteur 30", desc: "Mesure temps réel" },
-  { id: "SENS-031", lat: 43.713729, lng: 7.30232, aqi: 65, label: "Capteur 31", desc: "Mesure temps réel" },
-  { id: "SENS-032", lat: 43.72589, lng: 7.243702, aqi: 63, label: "Capteur 32", desc: "Mesure temps réel" },
-  { id: "SENS-033", lat: 43.721971, lng: 7.309338, aqi: 33, label: "Capteur 33", desc: "Mesure temps réel" },
-  { id: "SENS-034", lat: 43.732507, lng: 7.303808, aqi: 36, label: "Capteur 34", desc: "Mesure temps réel" },
-  { id: "SENS-035", lat: 43.706073, lng: 7.229865, aqi: 72, label: "Capteur 35", desc: "Mesure temps réel" },
-  { id: "SENS-036", lat: 43.733134, lng: 7.242649, aqi: 55, label: "Capteur 36", desc: "Mesure temps réel" },
-  { id: "SENS-037", lat: 43.697849, lng: 7.298253, aqi: 94, label: "Capteur 37", desc: "Mesure temps réel" },
-  { id: "SENS-038", lat: 43.699672, lng: 7.236666, aqi: 113, label: "Capteur 38", desc: "Mesure temps réel" },
-  { id: "SENS-039", lat: 43.712968, lng: 7.300978, aqi: 86, label: "Capteur 39", desc: "Mesure temps réel" },
-  { id: "SENS-040", lat: 43.699011, lng: 7.307149, aqi: 57, label: "Capteur 40", desc: "Mesure temps réel" },
-  { id: "SENS-041", lat: 43.707285, lng: 7.225743, aqi: 66, label: "Capteur 41", desc: "Mesure temps réel" },
-  { id: "SENS-042", lat: 43.703439, lng: 7.274356, aqi: 142, label: "Capteur 42", desc: "Mesure temps réel" },
-  { id: "SENS-043", lat: 43.703107, lng: 7.304639, aqi: 97, label: "Capteur 43", desc: "Mesure temps réel" },
-  { id: "SENS-044", lat: 43.717847, lng: 7.285666, aqi: 108, label: "Capteur 44", desc: "Mesure temps réel" },
-  { id: "SENS-045", lat: 43.720049, lng: 7.311463, aqi: 25, label: "Capteur 45", desc: "Mesure temps réel" }
+
+// ================= FALLBACK DATA =================
+const FALLBACK_SENSORS_DATA = [
+  { id: "SENS-001", lat: 43.696, lng: 7.265, aqi: 95, label: "Centre", desc: "Trafic saturé" },
+  { id: "SENS-002", lat: 43.701, lng: 7.278, aqi: 55, label: "Vieux Nice", desc: "Zone piétonne" },
+  { id: "SENS-003", lat: 43.715, lng: 7.268, aqi: 25, label: "Cimiez", desc: "Parc et jardins" },
+  { id: "SENS-006", lat: 43.720, lng: 7.25, aqi: 15, label: "Collines", desc: "Zone naturelle" },
 ];
 
 // ================= RE-CENTER MAP =================
@@ -374,6 +336,40 @@ export default function Map({
   const [zoom, setZoom] = useState(13);
   const showPoints = showPollution && zoom >= POINTS_ZOOM_THRESHOLD;
   const showHeat = showPollution && zoom < POINTS_ZOOM_THRESHOLD;
+  const [sensorsData, setSensorsData] = useState(FALLBACK_SENSORS_DATA);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchSensorData() {
+      try {
+        const result = await getSensorData();
+        if (result.success && result.data && result.data.length > 0) {
+          // Transformer les données de l'API au format attendu
+          const transformedData = result.data.map((item, index) => ({
+            id: item.capteur_id || `SENS-${index}`,
+            lat: item.latitude || item.lat,
+            lng: item.longitude || item.lng,
+            aqi: item.aqi || item.pm25 || 50,
+            label: item.label || item.capteur_id || `Capteur ${index + 1}`,
+            desc: item.description || item.desc || "Capteur actif",
+          }));
+          setSensorsData(transformedData);
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération des capteurs:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSensorData();
+
+    // Rafraîchir les données toutes les 30 secondes
+    const interval = setInterval(fetchSensorData, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <MapContainer
@@ -406,6 +402,16 @@ export default function Map({
       {showHeat && (
         <>
           <SensorGradientLayer points={activeSensors} />
+          <PollutionHeatmapLayer points={sensorsData} />
+          {sensorsData.map((sensor) => (
+            <Marker key={sensor.id} position={[sensor.lat, sensor.lng]}>
+              <Popup>
+                <strong>{sensor.label}</strong>
+                <div className="text-muted">{sensor.desc}</div>
+                <div className="fw-bold mt-1">AQI {sensor.aqi}</div>
+              </Popup>
+            </Marker>
+          ))}
         </>
       )}
 
