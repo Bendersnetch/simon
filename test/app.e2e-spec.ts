@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { StreamConsumerService } from '../src/ingestion-bdd/stream-consumer.service';
 import { CassandraService } from '../src/cassandra/cassandra.service';
 
 describe('AppController (e2e)', () => {
@@ -24,6 +25,10 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(CassandraService)
       .useValue(mockCassandraService)
+      .overrideProvider(StreamConsumerService)
+      .useValue({
+        onModuleInit: jest.fn(),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

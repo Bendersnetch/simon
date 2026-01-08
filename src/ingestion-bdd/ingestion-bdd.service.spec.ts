@@ -34,39 +34,9 @@ describe('IngestionBddService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('testPing', () => {
-    it('should process valid JSON message', async () => {
-      const payload = { test: 'data' };
-      const message = {
-        value: Buffer.from(JSON.stringify(payload)),
-      };
-
-      // We are just testing that it doesn't throw and parses correctly
-      // Since the method doesn't return anything or call external services in the success path (other than log),
-      // we just ensure it executes without error.
-      await expect(service.testPing(message)).resolves.not.toThrow();
-    });
-
-    it('should handle invalid JSON message gracefully', async () => {
-      const message = {
-        value: Buffer.from('invalid-json'),
-      };
-
-      await expect(service.testPing(message)).resolves.not.toThrow();
-    });
-
-    it('should ignore message with empty value (tombstone)', async () => {
-      const message = {
-        value: null,
-      };
-
-      await expect(service.testPing(message)).resolves.not.toThrow();
-    });
-  });
-
-  describe('addSensorData', () => {
+  describe('processIngestionEvent', () => {
     it('should save ingestion data to cassandra', async () => {
-      const ingestionData: Ingestion = {
+      const ingestionData = {
         origin: 'sensor-1',
         timestamp: new Date(),
         uv: 5.5,
@@ -75,7 +45,7 @@ describe('IngestionBddService', () => {
         qair: [1.1, 2.2],
       };
 
-      await service.addSensorData(ingestionData);
+      await service.processIngestionEvent(ingestionData);
 
       expect(cassandraService.execute).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO capteur_data.ingestion_data'),
