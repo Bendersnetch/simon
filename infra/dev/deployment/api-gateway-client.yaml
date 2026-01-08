@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-client-deployment
+  labels:
+    app: api-gateway-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-client
+  template:
+    metadata:
+      labels:
+        app: api-gateway-client
+    spec:
+      initContainers:
+      - name: wait-for-auth-service
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for api-auth-user to be ready..."
+          until nc -z -w 2 api-auth-user-service.default.svc.cluster.local 3002 2>/dev/null; do
+            echo "Auth service not ready, waiting..."
+            sleep 2
+          done
+          echo "Auth service is ready!"
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
+      containers:
+      - name: api-gateway-client-container
+        image: 127.0.0.1:5000/api-gateway-client:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 3003
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+        env:
+        - name: NODE_ENV
+          value: "development"
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: api-gateway-client-config
+              key: PORT
+        - name: AUTH_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: api-gateway-client-config
+              key: AUTH_SERVICE_URL

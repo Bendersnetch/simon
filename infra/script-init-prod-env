@@ -1,0 +1,435 @@
+#!/bin/bash
+
+# Vérifier qu'on n'est PAS root (minikube ne peut pas tourner en root avec docker driver)
+if [ "$EUID" -eq 0 ]; then
+    echo "❌ Erreur: Ne pas exécuter ce script avec sudo"
+    echo "   Exécutez: ./script-init-prod-env"
+    echo "   (Le script demandera sudo uniquement quand nécessaire)"
+    exit 1
+fi
+
+# Demander le nom de domaine Azure
+echo "======================================"
+echo "Initialisation environnement PROD"
+echo "======================================"
+echo ""
+read -p "Entrez le nom DNS de votre VM Azure (ex: simon-vm.francecentral.cloudapp.azure.com): " AZURE_DNS
+if [ -z "$AZURE_DNS" ]; then
+    echo "ERREUR: Le nom DNS est obligatoire"
+    exit 1
+fi
+
+echo "✓ Nom DNS configuré: $AZURE_DNS"
+echo ""
+
+# Créer le dossier de travail
+WORK_DIR="$HOME/simon-prod"
+echo "Création du dossier de travail : $WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# Cloner uniquement le dépôt infra
+echo ""
+echo "======================================"
+echo "Clonage du dépôt infra"
+echo "======================================"
+echo ""
+
+if [ ! -d "infra" ]; then
+    echo "Clonage du dépôt infra..."
+    git clone https://iut-git.unice.fr/simon/infra || {
+        echo "ERREUR: Impossible de cloner le dépôt infra"
+        exit 1
+    }
+else
+    echo "✓ Dépôt infra déjà présent"
+fi
+
+echo "✓ Dépôt infra prêt"
+echo ""
+
+# Vérifier et installer Docker
+if ! command -v docker &> /dev/null; then
+    echo "Installation de Docker (nécessite sudo)..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    rm get-docker.sh
+    echo "Docker installé."
+fi
+
+# Ajouter l'utilisateur au groupe docker si nécessaire
+if ! groups | grep -q docker; then
+    echo "Ajout de l'utilisateur au groupe docker (nécessite sudo)..."
+    sudo usermod -aG docker $USER
+    echo "⚠️  Vous devez vous déconnecter/reconnecter ou exécuter: newgrp docker"
+    echo "   Puis relancer ce script"
+    exit 0
+fi
+
+# Installer kubectl si non présent
+if ! command -v kubectl &> /dev/null; then
+    echo "Installation de kubectl (nécessite sudo)..."
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    rm kubectl
+    echo "kubectl installé."
+fi
+
+# Installer minikube si non présent
+if ! command -v minikube &> /dev/null; then
+    echo "Installation de minikube (nécessite sudo)..."
+    curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+    sudo install minikube-linux-amd64 /usr/local/bin/minikube
+    rm minikube-linux-amd64
+    echo "Minikube installé."
+fi
+
+# Démarrer minikube avec un profil spécifique pour prod (SANS sudo)
+echo "Démarrage de minikube (profil prod)..."
+minikube start --profile prod --driver=docker --cpus=2 --memory=3072mb
+
+# Configurer kubectl pour le profil prod
+minikube profile prod
+
+# Configurer kubectl pour utiliser minikube (et pas k3s)
+export KUBECONFIG=~/.kube/config
+minikube update-context --profile prod
+
+# Installer Helm si non présent
+if ! command -v helm &> /dev/null; then
+    echo "Installation de Helm (nécessite sudo)..."
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sudo bash
+    echo "Helm installé."
+fi
+
+# Ajouter les repos Helm nécessaires
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Créer namespaces
+kubectl create namespace argocd --context prod
+kubectl create namespace ingress-nginx --context prod
+
+# Installer nginx-ingress controller
+echo "======================================"
+echo "Installation de nginx-ingress"
+echo "======================================"
+echo ""
+
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --kube-context prod \
+  --namespace ingress-nginx \
+  --set controller.hostNetwork=true \
+  --set controller.kind=DaemonSet \
+  --set controller.service.type=NodePort \
+  --set controller.containerPort.http=80 \
+  --set controller.containerPort.https=443 \
+  --set-string 'controller.service.ports.http-alt=8080' \
+  --wait
+
+echo "✓ nginx-ingress installé (hostNetwork pour VM Azure)"
+echo ""
+
+# Attendre que nginx soit prêt
+kubectl --context prod wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+
+echo "✓ nginx-ingress prêt (ports 80 et 8080 disponibles via hostNetwork)"
+echo ""
+
+# Installer ArgoCD via Helm
+echo "======================================"
+echo "Installation d'ArgoCD"
+echo "======================================"
+echo ""
+
+helm install argocd argo/argo-cd \
+  --kube-context prod \
+  --namespace argocd \
+  --set server.service.type=ClusterIP \
+  --wait
+
+echo "✓ ArgoCD installé"
+echo ""
+
+# Installer ArgoCD Image Updater via Helm
+helm install argocd-image-updater argo/argocd-image-updater \
+  --kube-context prod \
+  --namespace argocd \
+  --wait
+
+# Récupérer le mot de passe admin initial d'ArgoCD
+ARGOCD_PASSWORD=$(kubectl --context prod -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+echo "ArgoCD installé. Mot de passe admin initial:"
+echo "$ARGOCD_PASSWORD"
+echo ""
+
+# Configurer ArgoCD Image Updater pour surveiller les registres d'images
+echo "======================================"
+echo "Configuration d'ArgoCD Image Updater"
+echo "======================================"
+echo ""
+
+# Créer une ConfigMap pour configurer les registres à surveiller
+cat <<EOF | kubectl --context prod apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: argocd
+data:
+  # Liste des registres à surveiller (Docker Hub par défaut)
+  registries.conf: |
+    registries:
+    - name: Docker Hub
+      api_url: https://registry-1.docker.io
+      ping: yes
+      credentials: pullsecret:argocd/dockerhub-secret
+      default: yes
+EOF
+
+echo "✓ Configuration du registry pour Image Updater"
+echo ""
+echo "⚠️  IMPORTANT: Pour que l'Image Updater puisse surveiller vos images:"
+echo "   1. Créez un secret pour vos credentials Docker Hub (si images privées):"
+echo "      kubectl create secret docker-registry dockerhub-secret \\"
+echo "        --docker-server=https://registry-1.docker.io \\"
+echo "        --docker-username=<username> \\"
+echo "        --docker-password=<password> \\"
+echo "        --docker-email=<email> \\"
+echo "        --context prod -n argocd"
+echo ""
+echo "   2. Dans vos Applications ArgoCD, ajoutez ces annotations:"
+echo "      argocd-image-updater.argoproj.io/image-list: <nom-image>:<registry>/<image>:<version>"
+echo "      argocd-image-updater.argoproj.io/update-strategy: semver"
+echo ""
+echo "   Exemple pour une API:"
+echo "      argocd-image-updater.argoproj.io/image-list: api-capteur=dockerhub/simon/api-capteur:~1.0"
+echo "      argocd-image-updater.argoproj.io/update-strategy: semver"
+echo ""
+
+
+# Créer namespaces pour monitoring et applications
+kubectl --context prod create namespace monitoring || true
+kubectl --context prod create namespace simon-prod || true
+
+# Installer Prometheus via Helm
+echo "======================================"
+echo "Installation de Prometheus"
+echo "======================================"
+echo ""
+
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --kube-context prod \
+  --namespace monitoring \
+  --set prometheus.service.type=ClusterIP \
+  --set grafana.service.type=ClusterIP \
+  --set grafana.adminPassword=admin \
+  --wait
+
+echo "✓ Prometheus et Grafana installés"
+echo ""
+
+# Créer les ressources Ingress
+echo "======================================"
+echo "Configuration des Ingress"
+echo "======================================"
+echo ""
+
+# Ingress pour ArgoCD (sur le domaine principal)
+cat <<EOF | kubectl --context prod apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ${AZURE_DNS}
+    http:
+      paths:
+      - path: /argocd
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+EOF
+
+# Configurer ArgoCD pour fonctionner sous /argocd
+kubectl --context prod patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"server.rootpath":"/argocd","server.insecure":"true"}}'
+kubectl --context prod rollout restart deployment argocd-server -n argocd
+
+# Ingress pour Prometheus
+cat <<EOF | kubectl --context prod apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ${AZURE_DNS}
+    http:
+      paths:
+      - path: /prometheus(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: prometheus-kube-prometheus-prometheus
+            port:
+              number: 9090
+EOF
+
+# Configurer Prometheus pour fonctionner sous /prometheus
+kubectl --context prod patch prometheus prometheus-kube-prometheus-prometheus -n monitoring --type merge -p '{"spec":{"externalUrl":"http://'${AZURE_DNS}'/prometheus","routePrefix":"/"}}'
+
+# Ingress pour Grafana
+cat <<EOF | kubectl --context prod apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ${AZURE_DNS}
+    http:
+      paths:
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-grafana
+            port:
+              number: 80
+EOF
+
+# Configurer Grafana pour fonctionner sous /grafana via Helm values
+kubectl --context prod set env deployment/prometheus-grafana \
+  -n monitoring \
+  GF_SERVER_ROOT_URL="http://${AZURE_DNS}/grafana" \
+  GF_SERVER_SERVE_FROM_SUB_PATH="true"
+
+echo "✓ Ingress créés pour ArgoCD, Prometheus et Grafana"
+echo ""
+
+echo ""
+echo "======================================"
+echo "Setup production terminé!"
+echo "======================================"
+echo ""
+echo "Répertoire de travail : $WORK_DIR"
+echo ""
+echo "Infrastructure installée :"
+echo "  ✓ Docker Engine"
+echo "  ✓ kubectl"
+echo "  ✓ Minikube (profil: prod, driver: docker)"
+echo "  ✓ Helm"
+echo "  ✓ nginx-ingress (hostNetwork pour VM Azure)"
+echo "  ✓ ArgoCD + ArgoCD Image Updater"
+echo "  ✓ Prometheus + Grafana"
+echo ""
+echo "======================================"
+echo "Interfaces Web (via Ingress - Port 80)"
+echo "======================================"
+echo ""
+echo "ArgoCD (GitOps):"
+echo "  URL:      http://${AZURE_DNS}/argocd"
+echo "  Username: admin"
+echo "  Password: $ARGOCD_PASSWORD"
+echo ""
+echo "Prometheus (Métriques):"
+echo "  URL:      http://${AZURE_DNS}/prometheus"
+echo ""
+echo "Grafana (Dashboards):"
+echo "  URL:      http://${AZURE_DNS}/grafana"
+echo "  Username: admin"
+echo "  Password: admin"
+echo ""
+echo "======================================"
+echo "Applications (Port 8080)"
+echo "======================================"
+echo ""
+echo "Pour exposer vos applications sur le port 8080:"
+echo "  1. Créez un Ingress avec l'annotation:"
+echo "     nginx.ingress.kubernetes.io/server-snippet: 'listen 8080;'"
+echo ""
+echo "  Exemple pour le frontend:"
+echo "  ---"
+echo "  apiVersion: networking.k8s.io/v1"
+echo "  kind: Ingress"
+echo "  metadata:"
+echo "    name: frontend-ingress"
+echo "    namespace: simon-prod"
+echo "    annotations:"
+echo "      nginx.ingress.kubernetes.io/ssl-redirect: \"false\""
+echo "  spec:"
+echo "    ingressClassName: nginx"
+echo "    rules:"
+echo "    - host: ${AZURE_DNS}"
+echo "      http:"
+echo "        paths:"
+echo "        - path: /"
+echo "          pathType: Prefix"
+echo "          backend:"
+echo "            service:"
+echo "              name: frontend"
+echo "              port:"
+echo "                number: 80"
+echo ""
+echo "  Accessible sur: http://${AZURE_DNS}/ (port 80)"
+echo "  Pour le port 8080, utilisez NodePort dans votre service."
+echo ""
+echo "⚠️  Ports ouverts requis sur Azure NSG:"
+echo "  - Port 80  (HTTP - outils admin + apps)"
+echo "  - Port 8080 (HTTP - applications, si NodePort utilisé)"
+echo ""
+echo "======================================"
+echo "Namespaces créés"
+echo "======================================"
+echo "  - argocd        (ArgoCD et Image Updater)"
+echo "  - monitoring    (Prometheus, Grafana, AlertManager)"
+echo "  - simon-prod    (Vos applications)"
+echo ""
+echo "======================================"
+echo "Prochaines étapes"
+echo "======================================"
+echo "  1. ✓ Ports 80 et 8080 déjà ouverts dans votre NSG Azure"
+echo "  2. Connectez-vous à ArgoCD: http://${AZURE_DNS}/argocd"
+echo "  3. Configurez vos credentials Docker Hub (si images privées):"
+echo "     kubectl create secret docker-registry dockerhub-secret \\"
+echo "       --docker-server=https://registry-1.docker.io \\"
+echo "       --docker-username=<user> --docker-password=<token> \\"
+echo "       --context prod -n argocd"
+echo "  4. Créez vos Applications ArgoCD dans infra/prod/"
+echo "     - Frontend exposé sur port 8080 (NodePort ou Ingress)"
+echo "     - APIs exposées sur port 80 (Ingress avec paths)"
+echo "  5. Ajoutez les annotations Image Updater pour auto-update"
+echo "  6. Consultez Prometheus: http://${AZURE_DNS}/prometheus"
+echo "  7. Consultez Grafana: http://${AZURE_DNS}/grafana"
+echo ""
+echo "Commandes utiles:"
+echo "  kubectl --context prod get all -n simon-prod         # Voir vos apps"
+echo "  kubectl --context prod get applications -n argocd    # Apps ArgoCD"
+echo "  kubectl --context prod get ingress -A                # Voir les Ingress"
+echo "  kubectl --context prod logs -n argocd -l app.kubernetes.io/name=argocd-image-updater"
+echo "  kubectl --context prod logs -n ingress-nginx -l app.kubernetes.io/component=controller"
+echo "  minikube profile prod                                 # Profil prod"
+echo ""
