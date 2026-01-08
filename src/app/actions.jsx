@@ -35,6 +35,45 @@ export async function loginUser(email, password) {
     }
 }
 
+/**
+ * Créer un nouvel utilisateur via l'API /api/v1/auth/register
+ */
+export async function registerUser({ nom, prenom, email, password, role = 'USER' }) {
+    try {
+        const token = await getAuthToken();
+        if (!token) throw new Error("Non authentifié - veuillez vous connecter");
+
+        const apiGatewayUrl = process.env.API_GATEWAY_URL;
+        const response = await fetch(`${apiGatewayUrl}/api/v1/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                lastname: nom,
+                firstname: prenom,
+                email,
+                password,
+                // Le rôle n'est pas dans le DTO actuel, mais on le garde au cas où ou on l'ignore si l'API est stricte.
+                // L'API semble attendre firstname/lastname.
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Erreur ${response.status}: Impossible de créer l'utilisateur`);
+        }
+
+        const data = await response.json();
+        console.log('[registerUser] User created:', data);
+        return { success: true, data };
+    } catch (error) {
+        console.error('Register user error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // Helper pour récupérer le token
 async function getAuthToken() {
     return (await cookies()).get('session_token')?.value;
@@ -66,6 +105,37 @@ export async function getSensorData() {
         return { success: true, data };
     } catch (error) {
         console.error('Sensor data error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Récupérer la liste de tous les capteurs enregistrés (depuis PostgreSQL)
+ */
+export async function getAllSensors() {
+    try {
+        const apiGatewayUrl = process.env.API_GATEWAY_URL;
+        const url = `${apiGatewayUrl}/api/v1/sensor-gateway`;
+
+        console.log(`[getAllSensors] Fetching from: ${url}`);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            console.error(`[getAllSensors] Error: ${response.status} - ${text}`);
+            throw new Error(`API Error ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`[getAllSensors] Received ${data.length} sensors`);
+        return { success: true, data };
+    } catch (error) {
+        console.error('Get all sensors error:', error);
         return { success: false, error: error.message };
     }
 }

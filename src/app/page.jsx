@@ -6,7 +6,7 @@ import { Button, Modal, Form, Alert } from "react-bootstrap";
 import LoginScreen from "./LoginScreen";
 import UserManagementScreen from "./UserManagementScreen";
 import { FaUsers } from "react-icons/fa";
-import { addSensor } from "./actions";
+import { addSensor, registerUser } from "./actions";
 
 // Map (Leaflet) – désactivé côté SSR
 const Map = dynamic(() => import("./components/Map"), {
@@ -217,8 +217,16 @@ export default function Page() {
 
     const nom = addNom.trim();
     // Valeurs par défaut pour les champs masqués
-    const origin = "manual";
-    const apiKey = "manual-key";
+    // Générer un origin unique basé sur le nom du capteur (slug)
+    const slugify = (text) => text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+      .replace(/[^a-z0-9]+/g, '-')     // Remplacer les caractères spéciaux par des tirets
+      .replace(/^-+|-+$/g, '');        // Supprimer les tirets en début/fin
+
+    const origin = `manual-${slugify(nom)}-${Date.now()}`;
+    const apiKey = `key-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const type = "pollution";
     const active = true;
 
@@ -1070,7 +1078,23 @@ export default function Page() {
 
       {/* ================= USER MANAGEMENT ================= */}
       {showUserManagement && (
-        <UserManagementScreen onBack={() => setShowUserManagement(false)} />
+        <UserManagementScreen
+          onBack={() => setShowUserManagement(false)}
+          onCreate={async (draft) => {
+            // Appeler l'API pour créer l'utilisateur
+            const result = await registerUser({
+              nom: draft.nom,
+              prenom: draft.prenom,
+              email: draft.email,
+              password: draft.password || 'default123', // Mot de passe par défaut si non fourni
+              role: 'USER'
+            });
+            if (!result.success) {
+              throw new Error(result.error);
+            }
+            return result.data;
+          }}
+        />
       )}
     </div>
   );
