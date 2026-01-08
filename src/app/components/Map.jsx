@@ -314,40 +314,73 @@ function ZoomWatcher({ onZoomChange }) {
   return null;
 }
 
-function LegendControl() {
+function LegendControl({ activeLayer }) {
   const map = useMap();
+  const controlRef = useRef(null);
+
+  console.log("LegendControl: activeLayer =", activeLayer);
 
   useEffect(() => {
     if (!map) return;
 
+    // Supprimer l'ancien control s'il existe
+    if (controlRef.current) {
+      controlRef.current.remove();
+    }
+
+    // Ne pas afficher de légende si aucun calque n'est actif
+    if (!activeLayer) return;
+
+    // Configuration des légendes par type
+    const legendConfigs = {
+      pollution: {
+        title: "AQI",
+        gradient: "linear-gradient(90deg, #22c55e 0%, #84cc16 18%, #facc15 36%, #fb923c 54%, #ef4444 72%, #a855f7 86%, #7f1d1d 100%)",
+        labels: ["0", "50", "100", "150", "200+"],
+      },
+      temperature: {
+        title: "Température",
+        gradient: "linear-gradient(90deg, #3b82f6 0%, #60a5fa 15%, #22d3ee 30%, #22c55e 45%, #facc15 65%, #fb923c 80%, #ef4444 100%)",
+        labels: ["≤0°C", "10°C", "20°C", "30°C", ">35°C"],
+      },
+      humidity: {
+        title: "Humidité",
+        gradient: "linear-gradient(90deg, #fef3c7 0%, #a5f3fc 25%, #22d3ee 50%, #3b82f6 75%, #1e3a8a 100%)",
+        labels: ["0%", "25%", "50%", "75%", "100%"],
+      },
+      uv: {
+        title: "Indice UV",
+        gradient: "linear-gradient(90deg, #22c55e 0%, #facc15 25%, #fb923c 50%, #ef4444 75%, #a855f7 100%)",
+        labels: ["1-2", "3-5", "6-7", "8-10", "11+"],
+      },
+    };
+
+    const config = legendConfigs[activeLayer];
+    if (!config) return;
+
     const control = L.control({ position: "bottomright" });
     control.onAdd = () => {
-      const div = L.DomUtil.create("div", "aqi-legend");
-      div.style.background = "rgba(255,255,255,0.9)";
+      const div = L.DomUtil.create("div", "data-legend");
+      div.style.background = "rgba(255,255,255,0.95)";
       div.style.borderRadius = "10px";
-      div.style.padding = "10px 12px";
+      div.style.padding = "10px 14px";
       div.style.boxShadow = "0 8px 24px rgba(0,0,0,0.15)";
       div.style.fontSize = "12px";
       div.style.lineHeight = "1.2";
       div.style.color = "#111827";
+      div.style.minWidth = "160px";
 
       const title = L.DomUtil.create("div", "", div);
-      title.textContent = "AQI";
+      title.textContent = config.title;
       title.style.fontWeight = "700";
       title.style.marginBottom = "8px";
 
-      const row = L.DomUtil.create("div", "", div);
-      row.style.display = "flex";
-      row.style.gap = "8px";
-      row.style.alignItems = "center";
-
       // Barre dégradée
-      const bar = L.DomUtil.create("div", "", row);
-      bar.style.width = "140px";
+      const bar = L.DomUtil.create("div", "", div);
+      bar.style.width = "100%";
       bar.style.height = "10px";
       bar.style.borderRadius = "999px";
-      bar.style.background =
-        "linear-gradient(90deg, #22c55e 0%, #84cc16 18%, #facc15 36%, #fb923c 54%, #ef4444 72%, #a855f7 86%, #7f1d1d 100%)";
+      bar.style.background = config.gradient;
       bar.style.boxShadow = "inset 0 0 0 1px rgba(0,0,0,0.06)";
 
       // Labels
@@ -356,20 +389,13 @@ function LegendControl() {
       labels.style.justifyContent = "space-between";
       labels.style.marginTop = "6px";
       labels.style.color = "#374151";
-      labels.style.gap = "8px";
+      labels.style.fontSize = "11px";
 
-      const l1 = L.DomUtil.create("span", "", labels);
-      l1.textContent = "0";
-      const l2 = L.DomUtil.create("span", "", labels);
-      l2.textContent = "50";
-      const l3 = L.DomUtil.create("span", "", labels);
-      l3.textContent = "100";
-      const l4 = L.DomUtil.create("span", "", labels);
-      l4.textContent = "150";
-      const l5 = L.DomUtil.create("span", "", labels);
-      l5.textContent = "200+";
+      config.labels.forEach((labelText) => {
+        const span = L.DomUtil.create("span", "", labels);
+        span.textContent = labelText;
+      });
 
-      // Empêche la carte de zoomer quand on scrolle sur la légende
       L.DomEvent.disableClickPropagation(div);
       L.DomEvent.disableScrollPropagation(div);
 
@@ -377,8 +403,15 @@ function LegendControl() {
     };
 
     control.addTo(map);
-    return () => control.remove();
-  }, [map]);
+    controlRef.current = control;
+
+    return () => {
+      if (controlRef.current) {
+        controlRef.current.remove();
+        controlRef.current = null;
+      }
+    };
+  }, [map, activeLayer]);
 
   return null;
 }
@@ -531,7 +564,7 @@ export default function Map({
 
       <ZoomWatcher onZoomChange={setZoom} />
       <ViewReporter onViewChange={onViewChange} />
-      <LegendControl />
+      <LegendControl activeLayer={activeLayer} />
 
       {/* Recentrage via recherche */}
       <RecenterMap center={center} />
