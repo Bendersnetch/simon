@@ -21,6 +21,8 @@ metadata:
 
     # Méthode de mise à jour : commit dans le dépôt Git (GitOps pur)
     argocd-image-updater.argoproj.io/write-back-method: git
+    # Secret pour l'authentification Git
+    argocd-image-updater.argoproj.io/git-creds: git-creds
 spec:
   project: default
 
