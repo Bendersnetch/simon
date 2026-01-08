@@ -52,13 +52,16 @@ describe('CassandraService', () => {
             expect(Client).toHaveBeenCalled();
             expect(connectMock).toHaveBeenCalled();
             // Should execute creation of keyspace and table
-            expect(executeMock).toHaveBeenCalledTimes(2);
+            expect(executeMock).toHaveBeenCalledTimes(3);
             expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('CREATE KEYSPACE IF NOT EXISTS'));
+            expect(executeMock).toHaveBeenCalledWith('USE capteur_data');
             expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('CREATE TABLE IF NOT EXISTS'));
         });
 
         it('should retry connection if it fails initially', async () => {
             jest.useFakeTimers();
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+            const logSpy = jest.spyOn(console, 'log').mockImplementation(() => { });
 
             const connectMock = jest.fn()
                 .mockRejectedValueOnce(new Error('Connection failed'))
@@ -84,6 +87,8 @@ describe('CassandraService', () => {
             expect(connectMock).toHaveBeenCalledTimes(2);
 
             jest.useRealTimers();
+            consoleSpy.mockRestore();
+            logSpy.mockRestore();
         });
     });
 

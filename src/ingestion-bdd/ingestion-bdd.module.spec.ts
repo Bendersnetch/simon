@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { IngestionBddModule } from './ingestion-bdd.module';
 import { IngestionBddService } from './ingestion-bdd.service';
+import { StreamConsumerService } from './stream-consumer.service';
 import { CassandraService } from '../cassandra/cassandra.service';
 
 describe('IngestionBddModule', () => {
@@ -15,6 +16,10 @@ describe('IngestionBddModule', () => {
                 onModuleInit: jest.fn(),
                 onModuleDestroy: jest.fn(),
                 execute: jest.fn(),
+            })
+            .overrideProvider(StreamConsumerService)
+            .useValue({
+                onModuleInit: jest.fn(),
             })
             .compile();
     });
