@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import { IngestionBddService } from './ingestion-bdd.service';
 
@@ -6,10 +6,11 @@ const STREAM_NAME = 'ingestion-stream';
 const GROUP_NAME = 'ingestion-group';
 
 @Injectable()
-export class StreamConsumerService implements OnModuleInit {
+export class StreamConsumerService implements OnModuleInit, OnModuleDestroy {
   private readonly redisClient: Redis;
   private readonly logger = new Logger(StreamConsumerService.name);
   private readonly consumerName: string = `consumer-${process.pid}`;
+  private isAlive = true;
 
   constructor(private readonly ingestionBddService: IngestionBddService) {
     this.redisClient = new Redis({ host: process.env.REDIS_HOST || 'redis' });
@@ -32,8 +33,13 @@ export class StreamConsumerService implements OnModuleInit {
     this.consume();
   }
 
+  onModuleDestroy() {
+    this.isAlive = false;
+    this.redisClient.disconnect();
+  }
+
   private async consume() {
-    while (true) {
+    while (this.isAlive) {
       try {
         const result: any = await this.redisClient.xreadgroup(
           'GROUP',
@@ -78,9 +84,11 @@ export class StreamConsumerService implements OnModuleInit {
           }
         }
       } catch (err) {
-        this.logger.error('Error in consume loop:', err);
-        // Attendre un peu avant de réessayer en cas d'erreur
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (this.isAlive) {
+          this.logger.error('Error in consume loop:', err);
+          // Attendre un peu avant de réessayer en cas d'erreur
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
     }
   }
