@@ -1,5 +1,7 @@
 'use server'
 
+import { cookies } from 'next/headers';
+
 export async function loginUser(email, password) {
     try {
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
@@ -17,6 +19,15 @@ export async function loginUser(email, password) {
         }
 
         const data = await response.json();
+
+        // Stocker le token dans un cookie sécurisé
+        (await cookies()).set('session_token', data.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 60 * 60 * 24 * 7, // 1 semaine
+            path: '/',
+        });
+
         return { success: true, token: data.token };
     } catch (error) {
         console.error('Login error:', error);
@@ -24,9 +35,15 @@ export async function loginUser(email, password) {
     }
 }
 
+// Helper pour récupérer le token
+async function getAuthToken() {
+    return (await cookies()).get('session_token')?.value;
+}
+
 export async function getSensorData() {
     try {
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
+        // Public endpoint, no auth needed usually, but can add if required
         const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-data-gateway/recent`, {
             method: 'GET',
             headers: {
@@ -49,11 +66,15 @@ export async function getSensorData() {
 
 export async function addSensor({ nom, origin, apiKey, type, latitude, longitude, active = true }) {
     try {
+        const token = await getAuthToken();
+        if (!token) throw new Error("Non authentifié");
+
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
-        const response = await fetch(`${apiGatewayUrl}/api/v1/capteur-gateway`, {
+        const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-gateway`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ nom, origin, apiKey, type, latitude, longitude, active }),
         });
@@ -77,12 +98,16 @@ export async function addSensor({ nom, origin, apiKey, type, latitude, longitude
  */
 export async function getSensorById(sensorId) {
     try {
+        const token = await getAuthToken();
+        if (!token) throw new Error("Non authentifié");
+
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
-        // TODO: Définir l'endpoint correct (ex: /capteur-gateway/:id ou /capteur-gateway?nom=XXX)
-        const response = await fetch(`${apiGatewayUrl}/api/v1/capteur-gateway/${sensorId}`, {
+        // TODO: Définir l'endpoint correct (ex: /sensor-gateway/:id ou /sensor-gateway?nom=XXX)
+        const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-gateway/${sensorId}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
         });
 
@@ -105,12 +130,16 @@ export async function getSensorById(sensorId) {
  */
 export async function updateSensor(sensorId, { latitude, longitude, nom, type }) {
     try {
+        const token = await getAuthToken();
+        if (!token) throw new Error("Non authentifié");
+
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
-        // TODO: Définir l'endpoint correct (ex: PUT /capteur-gateway/:id)
-        const response = await fetch(`${apiGatewayUrl}/api/v1/capteur-gateway/${sensorId}`, {
+        // TODO: Définir l'endpoint correct (ex: PUT /sensor-gateway/:id)
+        const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-gateway/${sensorId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ latitude, longitude, nom, type }),
         });
@@ -134,12 +163,16 @@ export async function updateSensor(sensorId, { latitude, longitude, nom, type })
  */
 export async function disableSensor(sensorId) {
     try {
+        const token = await getAuthToken();
+        if (!token) throw new Error("Non authentifié");
+
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
-        // TODO: Définir l'endpoint correct (ex: PATCH /capteur-gateway/:id/status)
-        const response = await fetch(`${apiGatewayUrl}/api/v1/capteur-gateway/${sensorId}/status`, {
+        // TODO: Définir l'endpoint correct (ex: PATCH /sensor-gateway/:id/status)
+        const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-gateway/${sensorId}/status`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ status: false }),
         });

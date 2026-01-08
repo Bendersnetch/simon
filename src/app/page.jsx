@@ -26,7 +26,7 @@ export default function Page() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const [showPollution, setShowPollution] = useState(true);
-  const [showVegetation, setShowVegetation] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [mapCenter, setMapCenter] = useState([43.7102, 7.262]); // Nice par défaut
   const [currentViewCenter, setCurrentViewCenter] = useState([43.7102, 7.262]);
@@ -214,28 +214,18 @@ export default function Page() {
     setDeviceError("");
 
     const nom = addNom.trim();
-    const origin = addOrigin.trim();
-    const apiKey = addApiKey.trim();
-    const type = addType.trim();
+    // Valeurs par défaut pour les champs masqués
+    const origin = "manual";
+    const apiKey = "manual-key";
+    const type = "pollution";
+    const active = true;
+
     const lat = Number(addLat);
     const lng = Number(addLng);
-    const active = addActive;
 
     // Validation
     if (!nom) {
       setDeviceError("Nom du capteur obligatoire.");
-      return;
-    }
-    if (!origin) {
-      setDeviceError("Origin obligatoire.");
-      return;
-    }
-    if (!apiKey) {
-      setDeviceError("API Key obligatoire.");
-      return;
-    }
-    if (!type) {
-      setDeviceError("Type obligatoire.");
       return;
     }
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -320,7 +310,7 @@ export default function Page() {
       >
         <Map
           showPollution={showPollution}
-          showVegetation={showVegetation}
+
           center={mapCenter}
           localSensors={localSensors}
           disabledSensorIds={disabledSensorIds}
@@ -609,18 +599,7 @@ export default function Page() {
             />
           </div>
 
-          {/* Végétation */}
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <div className="fw-semibold">Zones végétales</div>
-              <div className="small text-muted">Arbres & espaces verts</div>
-            </div>
-            <Form.Check
-              type="switch"
-              checked={showVegetation}
-              onChange={() => setShowVegetation(!showVegetation)}
-            />
-          </div>
+
         </div>
       </aside>
 
@@ -662,17 +641,7 @@ export default function Page() {
                 />
               </div>
 
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="fw-semibold">Zones végétales</div>
-                  <div className="small text-muted">Arbres & espaces verts</div>
-                </div>
-                <Form.Check
-                  type="switch"
-                  checked={showVegetation}
-                  onChange={() => setShowVegetation(!showVegetation)}
-                />
-              </div>
+
             </div>
           </div>
         </>
@@ -830,49 +799,19 @@ export default function Page() {
 
             <hr className="my-4" />
 
-            {/* Ajouter un capteur (comme avant) */}
+            {/* Ajouter un capteur */}
             <h5 className="fw-bold fs-6">Ajouter un capteur</h5>
             <p className="text-muted small">
-              Tous les champs sont obligatoires.
+              Saisissez l'ID unique et la position.
             </p>
 
             <Form.Group className="mb-3">
-              <Form.Label className="fs-7 fs-md-6">Nom (unique)</Form.Label>
+              <Form.Label className="fs-7 fs-md-6">ID capteur</Form.Label>
               <Form.Control
-                placeholder="SENS-001"
+                placeholder="SENS-202X"
                 className="fs-7 fs-md-6"
                 value={addNom}
                 onChange={(e) => setAddNom(e.target.value)}
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label className="fs-7 fs-md-6">Origin</Form.Label>
-              <Form.Control
-                placeholder="manual"
-                className="fs-7 fs-md-6"
-                value={addOrigin}
-                onChange={(e) => setAddOrigin(e.target.value)}
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label className="fs-7 fs-md-6">API Key</Form.Label>
-              <Form.Control
-                placeholder="my-api-key"
-                className="fs-7 fs-md-6"
-                value={addApiKey}
-                onChange={(e) => setAddApiKey(e.target.value)}
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label className="fs-7 fs-md-6">Type</Form.Label>
-              <Form.Control
-                placeholder="pollution"
-                className="fs-7 fs-md-6"
-                value={addType}
-                onChange={(e) => setAddType(e.target.value)}
               />
             </Form.Group>
 
@@ -900,15 +839,6 @@ export default function Page() {
                 />
               </div>
             </div>
-
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="checkbox"
-                label="Actif"
-                checked={addActive}
-                onChange={(e) => setAddActive(e.target.checked)}
-              />
-            </Form.Group>
 
             <div className="d-flex gap-2 flex-column flex-sm-row">
               <Button
