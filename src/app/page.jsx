@@ -6,6 +6,7 @@ import { Button, Modal, Form, Alert } from "react-bootstrap";
 import LoginScreen from "./LoginScreen";
 import UserManagementScreen from "./UserManagementScreen";
 import { FaUsers } from "react-icons/fa";
+import { addSensor } from "./actions";
 
 // Map (Leaflet) – désactivé côté SSR
 const Map = dynamic(() => import("./components/Map"), {
@@ -39,6 +40,7 @@ export default function Page() {
   const searchTimerRef = useRef(null);
 
   // ================== SENSORS STATE (pour gérer modify/disable/add) ==================
+  const [localSensors, setLocalSensors] = useState([]);
   const [disabledSensorIds, setDisabledSensorIds] = useState([]);
 
   // ================== MODALE APPAREILS ==================
@@ -53,11 +55,14 @@ export default function Page() {
   const [editLng, setEditLng] = useState("");
   const [editAqi, setEditAqi] = useState("");
 
-  // Ajout (ancien formulaire "Nouveau module")
-  const [addId, setAddId] = useState("");
+  // Ajout (formulaire de création de capteur)
+  const [addNom, setAddNom] = useState("");
+  const [addOrigin, setAddOrigin] = useState("");
+  const [addApiKey, setAddApiKey] = useState("");
+  const [addType, setAddType] = useState("");
   const [addLat, setAddLat] = useState("");
   const [addLng, setAddLng] = useState("");
-  const [addAqi, setAddAqi] = useState("50"); // par défaut
+  const [addActive, setAddActive] = useState(true);
 
   // Confirm désactivation
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
@@ -103,10 +108,14 @@ export default function Page() {
     setEditLat("");
     setEditLng("");
     setEditAqi("");
-    setAddId("");
+    // Reset formulaire création
+    setAddNom("");
+    setAddOrigin("");
+    setAddApiKey("");
+    setAddType("");
     setAddLat("");
     setAddLng("");
-    setAddAqi("50");
+    setAddActive(true);
     setShowDisableConfirm(false);
     setActivateSerial("");
   };
@@ -199,39 +208,96 @@ export default function Page() {
     setActivateSerial("");
   };
 
-  const handleAddSensor = () => {
+  // Traitement de l'ajout de capteur (version mise à jour)
+
+  const handleAddSensor = async () => {
     setDeviceError("");
 
-    const id = addId.trim().toUpperCase();
+    const nom = addNom.trim();
+    const origin = addOrigin.trim();
+    const apiKey = addApiKey.trim();
+    const type = addType.trim();
     const lat = Number(addLat);
     const lng = Number(addLng);
-    const aqi = Number(addAqi);
+    const active = addActive;
 
-    if (!id) {
-      setDeviceError("ID capteur obligatoire.");
+    // Validation
+    if (!nom) {
+      setDeviceError("Nom du capteur obligatoire.");
       return;
     }
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(aqi)) {
-      setDeviceError("Latitude/Longitude/AQI doivent être des nombres valides.");
+    if (!origin) {
+      setDeviceError("Origin obligatoire.");
       return;
     }
-    const exists = false; // Vérification désactivée - données gérées par le composant Map
+    if (!apiKey) {
+      setDeviceError("API Key obligatoire.");
+      return;
+    }
+    if (!type) {
+      setDeviceError("Type obligatoire.");
+      return;
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setDeviceError("Latitude/Longitude doivent être des nombres valides.");
+      return;
+    }
+
+    // Vérifier si le capteur existe déjà dans les capteurs locaux
+    const exists = localSensors.some((s) => (s.id || "").toString().toLowerCase() === nom.toLowerCase());
     if (exists) {
-      setDeviceError("Un capteur avec cet ID existe déjà.");
+      setDeviceError("Un capteur avec ce nom existe déjà.");
       return;
     }
 
-    // Note: Les données des capteurs sont maintenant gérées par l'API
-    // TODO: Appeler l'API pour ajouter le capteur
+    // Tenter d'ajouter via l'API Gateway
+    const result = await addSensor({
+      nom,
+      origin,
+      apiKey,
+      type,
+      latitude: lat,
+      longitude: lng,
+      active,
+    });
+
+    let newSensor;
+    if (result.success && result.data) {
+      // Utiliser les données retournées par l'API
+      const apiData = result.data;
+      // coordinates = [longitude, latitude]
+      const sensorLng = apiData.localisation?.coordinates?.[0] ?? lng;
+      const sensorLat = apiData.localisation?.coordinates?.[1] ?? lat;
+      newSensor = {
+        id: apiData.id?.toString() || nom,
+        lat: sensorLat,
+        lng: sensorLng,
+        aqi: 50, // AQI par défaut pour l'affichage
+        label: apiData.nom || nom,
+        desc: `Ajouté le ${new Date(apiData.dateInstallation).toLocaleDateString('fr-FR')}`,
+      };
+    } else {
+      // Fallback si l'API échoue
+      console.warn('API non disponible, ajout local:', result.error);
+      newSensor = { id: nom, lat, lng, aqi: 50, label: nom, desc: "Ajouté manuellement" };
+    }
+
+    // Ajouter au state local (pour affichage immédiat)
+    setLocalSensors((prev) => [...prev, newSensor]);
 
     // Au cas où il était désactivé avant
-    setDisabledSensorIds((prev) => prev.filter((x) => x !== id));
+    setDisabledSensorIds((prev) => prev.filter((x) => x !== newSensor.id));
 
-    setMapCenter([lat, lng]);
-    setAddId("");
+    setMapCenter([newSensor.lat, newSensor.lng]);
+
+    // Reset du formulaire
+    setAddNom("");
+    setAddOrigin("");
+    setAddApiKey("");
+    setAddType("");
     setAddLat("");
     setAddLng("");
-    setAddAqi("50");
+    setAddActive(true);
   };
 
   const canUseSerialActions = useMemo(() => {
@@ -256,7 +322,7 @@ export default function Page() {
           showPollution={showPollution}
           showVegetation={showVegetation}
           center={mapCenter}
-
+          localSensors={localSensors}
           disabledSensorIds={disabledSensorIds}
           onViewChange={({ center }) => {
             if (Array.isArray(center) && center.length === 2) {
@@ -767,44 +833,82 @@ export default function Page() {
             {/* Ajouter un capteur (comme avant) */}
             <h5 className="fw-bold fs-6">Ajouter un capteur</h5>
             <p className="text-muted small">
+              Tous les champs sont obligatoires.
             </p>
 
             <Form.Group className="mb-3">
-              <Form.Label className="fs-7 fs-md-6">ID capteur</Form.Label>
+              <Form.Label className="fs-7 fs-md-6">Nom (unique)</Form.Label>
               <Form.Control
-                placeholder="SENS-202X"
+                placeholder="SENS-001"
                 className="fs-7 fs-md-6"
-                value={addId}
-                onChange={(e) => setAddId(e.target.value)}
+                value={addNom}
+                onChange={(e) => setAddNom(e.target.value)}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fs-7 fs-md-6">Origin</Form.Label>
+              <Form.Control
+                placeholder="manual"
+                className="fs-7 fs-md-6"
+                value={addOrigin}
+                onChange={(e) => setAddOrigin(e.target.value)}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fs-7 fs-md-6">API Key</Form.Label>
+              <Form.Control
+                placeholder="my-api-key"
+                className="fs-7 fs-md-6"
+                value={addApiKey}
+                onChange={(e) => setAddApiKey(e.target.value)}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fs-7 fs-md-6">Type</Form.Label>
+              <Form.Control
+                placeholder="pollution"
+                className="fs-7 fs-md-6"
+                value={addType}
+                onChange={(e) => setAddType(e.target.value)}
               />
             </Form.Group>
 
             <div className="row g-2 mb-3">
-              <div className="col-4">
+              <div className="col-6">
+                <Form.Label className="fs-7 fs-md-6">Latitude</Form.Label>
                 <Form.Control
-                  placeholder="Latitude"
+                  placeholder="43.7"
                   className="fs-7 fs-md-6"
+                  type="number"
+                  step="any"
                   value={addLat}
                   onChange={(e) => setAddLat(e.target.value)}
                 />
               </div>
-              <div className="col-4">
+              <div className="col-6">
+                <Form.Label className="fs-7 fs-md-6">Longitude</Form.Label>
                 <Form.Control
-                  placeholder="Longitude"
+                  placeholder="7.26"
                   className="fs-7 fs-md-6"
+                  type="number"
+                  step="any"
                   value={addLng}
                   onChange={(e) => setAddLng(e.target.value)}
                 />
               </div>
-              <div className="col-4">
-                <Form.Control
-                  placeholder="AQI"
-                  className="fs-7 fs-md-6"
-                  value={addAqi}
-                  onChange={(e) => setAddAqi(e.target.value)}
-                />
-              </div>
             </div>
+
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                label="Actif"
+                checked={addActive}
+                onChange={(e) => setAddActive(e.target.checked)}
+              />
+            </Form.Group>
 
             <div className="d-flex gap-2 flex-column flex-sm-row">
               <Button

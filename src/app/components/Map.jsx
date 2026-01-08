@@ -328,13 +328,10 @@ export default function Map({
   center,
   showPollution,
   showVegetation,
-  sensors = FALLBACK_SENSORS_DATA,
+  localSensors = [],
   disabledSensorIds = [],
   onViewChange,
 }) {
-  const activeSensors = (sensors || []).filter(
-    (s) => !disabledSensorIds.includes(s.id)
-  );
 
   const [zoom, setZoom] = useState(13);
   const showPoints = showPollution && zoom >= POINTS_ZOOM_THRESHOLD;
@@ -374,6 +371,12 @@ export default function Map({
     return () => clearInterval(interval);
   }, []);
 
+  // Combiner les données de l'API avec les capteurs locaux
+  const allSensors = [...sensorsData, ...localSensors];
+  const activeSensors = allSensors.filter(
+    (s) => !disabledSensorIds.includes(s.id)
+  );
+
   return (
     <MapContainer
       preferCanvas={true}
@@ -405,15 +408,6 @@ export default function Map({
       {showHeat && (
         <>
           <SensorGradientLayer points={activeSensors} />
-          {sensorsData.map((sensor) => (
-            <Marker key={sensor.id} position={[sensor.lat, sensor.lng]}>
-              <Popup>
-                <strong>{sensor.label}</strong>
-                <div className="text-muted">{sensor.desc}</div>
-                <div className="fw-bold mt-1">AQI {sensor.aqi}</div>
-              </Popup>
-            </Marker>
-          ))}
         </>
       )}
 
