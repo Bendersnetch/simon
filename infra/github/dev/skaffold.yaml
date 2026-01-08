@@ -1,0 +1,162 @@
+apiVersion: skaffold/v4beta7
+kind: Config
+
+metadata:
+  name: simon-dev
+
+build:
+  local:
+    push: true
+    useBuildkit: true
+  artifacts:
+    - image: 127.0.0.1:5000/api-capteur
+      context: ../../APIs/api-capteur
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/api-ingestion
+      context: ../../APIs/api-ingestion
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/api-auth-user
+      context: ../../APIs/api-auth-user
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/api-gateway-client
+      context: ../../APIs/api-gateway-client
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/frontend
+      context: ../../simon
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*'
+            dest: /app
+          - src: 'app/**/*'
+            dest: /app
+          - src: 'components/**/*'
+            dest: /app
+          - src: 'public/**/*'
+            dest: /app/public
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/service-ingestion-bdd
+      context: ../../APIs/service-ingestion-bdd
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+    - image: 127.0.0.1:5000/api-sensor-data
+      context: ../../APIs/api-sensor-data
+      docker:
+        dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: 'src/**/*.ts'
+            dest: /app
+          - src: 'src/**/*.js'
+            dest: /app
+          - src: 'package.json'
+            dest: /app/package.json
+
+manifests:
+  rawYaml:
+    - configmap/*.yaml
+    - secret/*.yaml
+    - statefulset/*.yaml
+    - deployment/*.yaml
+    - service/*.yaml
+
+deploy:
+  kubectl: {}
+
+# Port forwarding automatique pour accéder à tes services
+portForward:
+  - resourceType: service
+    resourceName: api-capteur-service
+    port: 3000
+    localPort: 3000
+  - resourceType: service
+    resourceName: api-ingestion-service
+    port: 3001
+    localPort: 3001
+  - resourceType: service
+    resourceName: api-auth-user-service
+    port: 3002
+    localPort: 3002
+  - resourceType: service
+    resourceName: api-gateway-client-service
+    port: 3003
+    localPort: 3003
+  - resourceType: service
+    resourceName: frontend-service
+    port: 80
+    localPort: 8080
+  - resourceType: service
+    resourceName: postgis
+    port: 5432
+    localPort: 5432
+  - resourceType: service
+    resourceName: service-ingestion-bdd-service
+    port: 3004
+    localPort: 3004
+  - resourceType: service
+    resourceName: api-sensor-data-service
+    port: 3006
+    localPort: 3006
+  - resourceType: service
+    resourceName: redis
+    port: 6379
+    localPort: 6379
+  - resourceType: service
+    resourceName: cassandra
+    port: 9042
+    localPort: 9042
+
+# Registry local accessible via hostname '127.0.0.1:5000' depuis le réseau Minikube
+# Le conteneur registry est connecté au même réseau Docker que Minikube

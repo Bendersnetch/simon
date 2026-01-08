@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-sensor-data-deployment
+  labels:
+    app: api-sensor-data
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-sensor-data
+  template:
+    metadata:
+      labels:
+        app: api-sensor-data
+    spec:
+      initContainers:
+      - name: wait-for-cassandra-keyspace
+        image: cassandra:4.1
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for keyspace 'capteur_data' to be created..."
+          until cqlsh cassandra -e "DESCRIBE KEYSPACE capteur_data"; do
+            echo "Keyspace 'capteur_data' not ready, waiting..."
+            sleep 5
+          done
+          echo "Keyspace 'capteur_data' is ready!"
+      imagePullSecrets:
+      - name: dockerhub-secret
+      containers:
+      - name: api-sensor-data-container
+        image: beirdinhos/api-sensor-data:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 3006
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: api-sensor-data-config
+              key: NODE_ENV
+        - name: CASSANDRA_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: api-sensor-data-config
+              key: CASSANDRA_HOSTS
+        - name: CASSANDRA_KEYSPACE
+          valueFrom:
+            configMapKeyRef:
+              name: api-sensor-data-config
+              key: CASSANDRA_KEYSPACE
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: api-sensor-data-config
+              key: PORT
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3006
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3006
+          initialDelaySeconds: 30
+          periodSeconds: 10

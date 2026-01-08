@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-ingestion-bdd-deployment
+  labels:
+    app: service-ingestion-bdd
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: service-ingestion-bdd
+  template:
+    metadata:
+      labels:
+        app: service-ingestion-bdd
+    spec:
+      initContainers:
+      - name: wait-for-kafka
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for kafka to be ready..."
+          until nc -z -w 2 kafka.default.svc.cluster.local 9092 2>/dev/null; do
+            echo "Kafka not ready, waiting..."
+            sleep 2
+          done
+          echo "Kafka is ready!"
+      - name: wait-for-cassandra
+        image: cassandra:4.1
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for Cassandra to be fully ready..."
+          until cqlsh cassandra -e "SELECT release_version FROM system.local" > /dev/null 2>&1; do
+            echo "Cassandra not fully ready, waiting..."
+            sleep 5
+          done
+          echo "Cassandra is fully ready!"
+      imagePullSecrets:
+      - name: dockerhub-secret
+      containers:
+      - name: service-ingestion-bdd-container
+        image: beirdinhos/service-ingestion-bdd:latest
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 3004
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: service-ingestion-bdd-config
+              key: NODE_ENV
+        - name: KAFKA_BROKER
+          valueFrom:
+            configMapKeyRef:
+              name: service-ingestion-bdd-config
+              key: KAFKA_BROKER
+        - name: CASSANDRA_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: service-ingestion-bdd-config
+              key: CASSANDRA_HOSTS
+        - name: CASSANDRA_KEYSPACE
+          valueFrom:
+            configMapKeyRef:
+              name: service-ingestion-bdd-config
+              key: CASSANDRA_KEYSPACE
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: service-ingestion-bdd-config
+              key: PORT
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3004
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3004
+          initialDelaySeconds: 30
+          periodSeconds: 10

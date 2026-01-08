@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: simon-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Liste complète des images à surveiller avec leurs alias
+    argocd-image-updater.argoproj.io/image-list: >
+      api-capteur=beirdinhos/api-capteur,
+      api-auth-user=beirdinhos/api-auth-user,
+      api-ingestion=beirdinhos/api-ingestion,
+      api-gateway-client=beirdinhos/api-gateway-client,
+      frontend=beirdinhos/frontend,
+      api-sensor-data=beirdinhos/api-sensor-data,
+      service-ingestion-bdd=beirdinhos/service-ingestion-bdd
+    
+    # Stratégie de mise à jour "semver" par défaut pour toutes les images (plus robuste que "latest")
+    argocd-image-updater.argoproj.io/update-strategy: semver
+
+    # Méthode de mise à jour : commit dans le dépôt Git (GitOps pur)
+    argocd-image-updater.argoproj.io/write-back-method: git
+    # Secret pour l'authentification Git
+    argocd-image-updater.argoproj.io/git-creds: git-creds
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/BEIRDINH0S/simon-infra
+    targetRevision: HEAD
+    path: prod
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - Validate=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignorer les différences dans les annotations managedFields
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates
