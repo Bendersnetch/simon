@@ -8,8 +8,8 @@ export class CassandraService implements OnModuleInit, OnModuleDestroy {
     async onModuleInit() {
         this.client = new Client({
             contactPoints: ['cassandra'],
-            localDataCenter: 'datacenter1',
-            keyspace: "capteur_data"
+            localDataCenter: 'DC1',
+            socketOptions: { connectTimeout: 10000 } // Corrected property name
         });
 
         let connected = false;
@@ -18,18 +18,23 @@ export class CassandraService implements OnModuleInit, OnModuleDestroy {
                 await this.client.connect();
                 connected = true;
             } catch (err) {
+                console.error('Error connecting to Cassandra:', err);
                 console.log('Waiting for Cassandra to be ready...');
                 await new Promise(res => setTimeout(res, 3000));
             }
         }
 
+        // Create the keyspace first
         await this.client.execute(`
             CREATE KEYSPACE IF NOT EXISTS capteur_data
             WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
         `);
 
+        // Now connect to the keyspace
+        await this.client.execute('USE capteur_data');
+
         await this.client.execute(`
-            CREATE TABLE IF NOT EXISTS capteur_data.ingestion_data (
+            CREATE TABLE IF NOT EXISTS ingestion_data (
             id uuid PRIMARY KEY,
             origin text,
             timestamp timestamp,

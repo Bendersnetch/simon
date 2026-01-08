@@ -1,21 +1,10 @@
+// Dans src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
-    transport: Transport.KAFKA,
-    options: {
-      client: {
-        brokers: ['kafka:9092'],
-      },
-      consumer: {
-        groupId: `consumer-debug-${Date.now()}`,
-        allowAutoTopicCreation: true,
-      },
-    },  
-  });
-  
-  await app.listen();
+  // On crée une application standard, pas un microservice
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3004); // Le service écoute sur un port, mais sa tâche principale sera la boucle de consommation.
 }
 bootstrap();
