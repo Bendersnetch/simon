@@ -3,10 +3,8 @@ kind: Ingress
 metadata:
   name: frontend-ingress
   namespace: simon-prod
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   rules:
   - host: simon-prod.uksouth.cloudapp.azure.com
     http:
