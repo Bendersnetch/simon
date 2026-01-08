@@ -7,7 +7,11 @@ COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm install --omit-dev
 
-COPY . .
+COPY . . 
+
+RUN npm run test
+RUN npm run test:e2e
+
 RUN npm run build
 
 FROM node:20-alpine
