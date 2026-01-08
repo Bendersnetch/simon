@@ -187,7 +187,15 @@ function SensorPointsLayer({ points }) {
           }}
         >
           <Tooltip direction="top" offset={[0, -6]} opacity={1}>
-            {p.label ? `${p.label} · AQI ${p.aqi}` : `${p.id} · AQI ${p.aqi}`}
+            <div className="text-center">
+              <strong>{p.label || p.id}</strong>
+              <div style={{ fontSize: '0.9em', marginTop: '4px' }}>
+                AQI: {Math.round(p.aqi)}<br />
+                {p.temperature != null && <>Temp: {Number(p.temperature).toFixed(1)}°C<br /></>}
+                {p.humidite != null && <>Hum: {Number(p.humidite).toFixed(0)}%<br /></>}
+                {p.uv != null && <>UV: {Number(p.uv).toFixed(1)}</>}
+              </div>
+            </div>
           </Tooltip>
         </CircleMarker>
       ))}
@@ -196,27 +204,7 @@ function SensorPointsLayer({ points }) {
 }
 
 // ================= VEGETATION (ESPACES VERTS) =================
-const VEGETATION_ZONES = {
-  type: "FeatureCollection",
-  features: [
-    {
-      type: "Feature",
-      properties: { name: "Parc urbain" },
-      geometry: {
-        type: "Polygon",
-        coordinates: [
-          [
-            [7.255, 43.72],
-            [7.26, 43.72],
-            [7.26, 43.725],
-            [7.255, 43.725],
-            [7.255, 43.72],
-          ],
-        ],
-      },
-    },
-  ],
-};
+// Zones végétales supprimées
 
 
 
@@ -324,21 +312,33 @@ function LegendControl() {
 
 
 // ================= MAIN MAP =================
+// Coordonnées approximatives pour les capteurs connus de l'API
+const KNOWN_LOCATIONS = {
+  "nice-centre": { lat: 43.7009, lng: 7.2684 },
+  "nice-prom": { lat: 43.6952, lng: 7.2651 },
+  "nice-vieux": { lat: 43.6976, lng: 7.2755 },
+  "nice-port": { lat: 43.6998, lng: 7.2839 },
+  "nice-cimiez": { lat: 43.7195, lng: 7.2744 },
+  "nice-nord": { lat: 43.7292, lng: 7.2520 },
+  "nice-arenas": { lat: 43.6680, lng: 7.2154 },
+  "nice-saint-isidore": { lat: 43.7078, lng: 7.1957 },
+  "nice-mont-boron": { lat: 43.6991, lng: 7.2973 },
+  "nice-est": { lat: 43.7126, lng: 7.2913 },
+};
+
+// ================= MAIN MAP =================
 export default function Map({
   center,
   showPollution,
-  showVegetation,
-  sensors = FALLBACK_SENSORS_DATA,
+  localSensors = [],
   disabledSensorIds = [],
   onViewChange,
 }) {
-  const activeSensors = (sensors || []).filter(
-    (s) => !disabledSensorIds.includes(s.id)
-  );
 
   const [zoom, setZoom] = useState(13);
   const showPoints = showPollution && zoom >= POINTS_ZOOM_THRESHOLD;
   const showHeat = showPollution && zoom < POINTS_ZOOM_THRESHOLD;
+
   const [sensorsData, setSensorsData] = useState(FALLBACK_SENSORS_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -347,16 +347,45 @@ export default function Map({
     async function fetchSensorData() {
       try {
         const result = await getSensorData();
-        if (result.success && result.data && result.data.length > 0) {
-          // Transformer les données de l'API au format attendu
-          const transformedData = result.data.map((item, index) => ({
-            id: item.capteur_id || `SENS-${index}`,
-            lat: item.latitude || item.lat,
-            lng: item.longitude || item.lng,
-            aqi: item.aqi || item.pm25 || 50,
-            label: item.label || item.capteur_id || `Capteur ${index + 1}`,
-            desc: item.description || item.desc || "Capteur actif",
-          }));
+        if (result.success && result.data && Array.isArray(result.data)) {
+
+          // 1. Grouper par origin pour ne garder que le plus récent
+          const latestSensorsObj = {};
+
+          // Trier par timestamp croissant pour que le dernier écrase les précédents
+          const sortedData = [...result.data].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+          sortedData.forEach((item) => {
+            if (item.origin) {
+              latestSensorsObj[item.origin] = item;
+            }
+          });
+
+          // 2. Transformer en tableau
+          const uniqueSensors = Object.values(latestSensorsObj);
+
+          const transformedData = uniqueSensors.map((item, index) => {
+            const origin = item.origin || `SENS-${index}`;
+            // Récupérer coords depuis connus ou item ou fallback 0
+            const coords = KNOWN_LOCATIONS[origin] || item.location || { lat: item.latitude || item.lat || 0, lng: item.longitude || item.lng || 0 };
+
+            // Estimer un AQI affichable (si qair < 1, on multiplie par 100 pour l'échelle, sinon on prend brut)
+            let valQair = item.qair && item.qair.length > 0 ? item.qair[0] : 0;
+            if (valQair > 0 && valQair < 1) valQair = valQair * 100;
+
+            return {
+              id: origin,
+              lat: coords.lat,
+              lng: coords.lng,
+              aqi: valQair || (item.aqi || 50),
+              label: origin,
+              desc: item.temperature ? `Temp: ${item.temperature}°C` : (item.description || "Données reçues"),
+              temperature: item.temperature,
+              humidite: item.humidite,
+              uv: item.uv,
+            };
+          });
+
           setSensorsData(transformedData);
         }
       } catch (err) {
@@ -373,6 +402,12 @@ export default function Map({
     const interval = setInterval(fetchSensorData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Combiner les données de l'API avec les capteurs locaux
+  const allSensors = [...sensorsData, ...localSensors];
+  const activeSensors = allSensors.filter(
+    (s) => !disabledSensorIds.includes(s.id)
+  );
 
   return (
     <MapContainer
@@ -405,31 +440,12 @@ export default function Map({
       {showHeat && (
         <>
           <SensorGradientLayer points={activeSensors} />
-          {sensorsData.map((sensor) => (
-            <Marker key={sensor.id} position={[sensor.lat, sensor.lng]}>
-              <Popup>
-                <strong>{sensor.label}</strong>
-                <div className="text-muted">{sensor.desc}</div>
-                <div className="fw-bold mt-1">AQI {sensor.aqi}</div>
-              </Popup>
-            </Marker>
-          ))}
         </>
       )}
 
       {showPoints && <SensorPointsLayer points={activeSensors} />}
 
-      {/* Espaces verts */}
-      {showVegetation && (
-        <GeoJSON
-          data={VEGETATION_ZONES}
-          style={{
-            color: "#16a34a",
-            weight: 2,
-            fillOpacity: 0.25,
-          }}
-        />
-      )}
+
     </MapContainer>
   );
 }
