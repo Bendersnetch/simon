@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
-import { AuthGatewayService } from './../src/auth-gateway/auth-gateway.service';
+import { AuthGatewayService } from '../src/auth-user-gateway/auth-gateway/auth-gateway.service';
 
 describe('AuthGatewayController (e2e)', () => {
     let app: INestApplication;

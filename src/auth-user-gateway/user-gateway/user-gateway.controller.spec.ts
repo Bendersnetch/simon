@@ -8,7 +8,14 @@ describe('UserGatewayController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UserGatewayController],
-      providers: [UserGatewayService],
+      providers: [
+        {
+          provide: UserGatewayService,
+          useValue: {
+            deleteUserByEmail: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<UserGatewayController>(UserGatewayController);
