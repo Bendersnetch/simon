@@ -1,9 +1,11 @@
+# syntax=docker/dockerfile:1.4
 FROM node:20-alpine AS builder
 
 WORKDIR /api-gateway-client
 
 COPY package*.json ./
-RUN npm install --omit-dev
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --omit-dev
 
 COPY . . 
 
