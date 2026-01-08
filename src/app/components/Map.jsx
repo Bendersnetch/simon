@@ -6,11 +6,8 @@ import {
   ZoomControl,
   useMap,
   useMapEvents,
-  GeoJSON,
   CircleMarker,
   Tooltip,
-  Marker,
-  Popup,
 } from "react-leaflet";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
@@ -48,14 +45,66 @@ const AQI_LEGEND = [
   { label: "200+", color: "#7f1d1d" },
 ];
 
+// ================= TEMPERATURE =================
+const getTemperatureColor = (temp) => {
+  if (temp == null) return "#94a3b8"; // gris si pas de donnée
+  if (temp <= 0) return "#3b82f6";    // bleu froid
+  if (temp <= 10) return "#60a5fa";   // bleu clair
+  if (temp <= 18) return "#22d3ee";   // cyan
+  if (temp <= 24) return "#22c55e";   // vert agréable
+  if (temp <= 30) return "#facc15";   // jaune chaud
+  if (temp <= 35) return "#fb923c";   // orange
+  return "#ef4444";                    // rouge très chaud
+};
 
-// ================= FALLBACK DATA =================
-const FALLBACK_SENSORS_DATA = [
-  { id: "SENS-001", lat: 43.696, lng: 7.265, aqi: 95, label: "Centre", desc: "Trafic saturé" },
-  { id: "SENS-002", lat: 43.701, lng: 7.278, aqi: 55, label: "Vieux Nice", desc: "Zone piétonne" },
-  { id: "SENS-003", lat: 43.715, lng: 7.268, aqi: 25, label: "Cimiez", desc: "Parc et jardins" },
-  { id: "SENS-006", lat: 43.720, lng: 7.25, aqi: 15, label: "Collines", desc: "Zone naturelle" },
+const TEMPERATURE_LEGEND = [
+  { label: "≤0°C", color: "#3b82f6" },
+  { label: "1-10°C", color: "#60a5fa" },
+  { label: "11-18°C", color: "#22d3ee" },
+  { label: "19-24°C", color: "#22c55e" },
+  { label: "25-30°C", color: "#facc15" },
+  { label: "31-35°C", color: "#fb923c" },
+  { label: ">35°C", color: "#ef4444" },
 ];
+
+// ================= HUMIDITY =================
+const getHumidityColor = (humidity) => {
+  if (humidity == null) return "#94a3b8";
+  if (humidity <= 20) return "#fef3c7"; // très sec - beige
+  if (humidity <= 40) return "#a5f3fc"; // sec - bleu très clair
+  if (humidity <= 60) return "#22d3ee"; // normal - cyan
+  if (humidity <= 80) return "#3b82f6"; // humide - bleu
+  return "#1e3a8a";                      // très humide - bleu foncé
+};
+
+const HUMIDITY_LEGEND = [
+  { label: "0-20%", color: "#fef3c7" },
+  { label: "21-40%", color: "#a5f3fc" },
+  { label: "41-60%", color: "#22d3ee" },
+  { label: "61-80%", color: "#3b82f6" },
+  { label: "81-100%", color: "#1e3a8a" },
+];
+
+// ================= UV INDEX =================
+const getUVColor = (uv) => {
+  if (uv == null) return "#94a3b8";
+  if (uv <= 2) return "#22c55e";   // faible - vert
+  if (uv <= 5) return "#facc15";   // modéré - jaune
+  if (uv <= 7) return "#fb923c";   // élevé - orange
+  if (uv <= 10) return "#ef4444";  // très élevé - rouge
+  return "#a855f7";                 // extrême - violet
+};
+
+const UV_LEGEND = [
+  { label: "1-2 (faible)", color: "#22c55e" },
+  { label: "3-5 (modéré)", color: "#facc15" },
+  { label: "6-7 (élevé)", color: "#fb923c" },
+  { label: "8-10 (très élevé)", color: "#ef4444" },
+  { label: "11+ (extrême)", color: "#a855f7" },
+];
+
+
+
 
 // ================= RE-CENTER MAP =================
 function RecenterMap({ center }) {
@@ -70,25 +119,48 @@ function RecenterMap({ center }) {
   return null;
 }
 
-// ================= POLLUTION HEATMAP =================
-function SensorGradientLayer({ points }) {
+// ================= MAP REFRESHER (force redraw when data changes) =================
+function MapRefresher({ dataCount }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (dataCount > 0) {
+      console.log("MapRefresher: Data loaded, forcing map refresh");
+      // Petit délai pour laisser React finir le rendu
+      setTimeout(() => {
+        map.invalidateSize();
+        // Forcer un léger pan pour déclencher le redraw des layers
+        const center = map.getCenter();
+        map.panTo([center.lat + 0.0001, center.lng], { animate: false });
+        map.panTo([center.lat, center.lng], { animate: false });
+      }, 100);
+    }
+  }, [dataCount, map]);
+
+  return null;
+}
+
+// ================= GENERIC DATA GRADIENT LAYER =================
+function DataGradientLayer({ points, dataKey, colorFn }) {
   const map = useMap();
   const layerRef = useRef(null);
+  const colorFnRef = useRef(colorFn); // Store colorFn in ref to avoid stale closure
+  colorFnRef.current = colorFn;
 
   useEffect(() => {
     if (!map) return;
 
-    // Canvas overlay dédié (évite la normalisation/cumul d'une heatmap)
     const CanvasLayer = L.Layer.extend({
+      _points: [],
+
       onAdd: function () {
-        this._canvas = L.DomUtil.create("canvas", "aqi-gradient-canvas");
+        this._canvas = L.DomUtil.create("canvas", "data-gradient-canvas");
         this._canvas.style.position = "absolute";
         this._canvas.style.top = "0";
         this._canvas.style.left = "0";
         this._canvas.style.pointerEvents = "none";
         this._ctx = this._canvas.getContext("2d");
 
-        // Pane au-dessus des tuiles mais sous les tooltips/popups
         const pane = map.getPane("overlayPane");
         pane.appendChild(this._canvas);
 
@@ -108,12 +180,14 @@ function SensorGradientLayer({ points }) {
       _reset: function () {
         const size = map.getSize();
         const topLeft = map.containerPointToLayerPoint([0, 0]);
-
-        // Positionner le canvas
         L.DomUtil.setPosition(this._canvas, topLeft);
         this._canvas.width = size.x;
         this._canvas.height = size.y;
+        this._redraw();
+      },
 
+      setPoints: function (newPoints) {
+        this._points = newPoints || [];
         this._redraw();
       },
 
@@ -123,19 +197,17 @@ function SensorGradientLayer({ points }) {
         const size = map.getSize();
         ctx.clearRect(0, 0, size.x, size.y);
 
-        // Rayon en pixels (stable visuellement)
         const R = 120;
 
-        // Dessiner chaque capteur comme un cercle en dégradé radial
-        (points || []).forEach((p) => {
+        (this._points || []).forEach((p) => {
           const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-          const color = getAqiColor(p.aqi);
+          const value = p[dataKey];
+          const color = colorFnRef.current(value);
 
           const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, R);
-          // centre plus intense, bord transparent
-          grad.addColorStop(0.0, color + "CC");   // ~80% alpha
-          grad.addColorStop(0.65, color + "55");  // ~33% alpha
-          grad.addColorStop(1.0, color + "00");   // transparent
+          grad.addColorStop(0.0, color + "CC");
+          grad.addColorStop(0.65, color + "55");
+          grad.addColorStop(1.0, color + "00");
 
           ctx.fillStyle = grad;
           ctx.beginPath();
@@ -143,7 +215,6 @@ function SensorGradientLayer({ points }) {
           ctx.fill();
         });
 
-        // Un peu de lissage global
         ctx.globalCompositeOperation = "source-over";
       },
     });
@@ -158,47 +229,49 @@ function SensorGradientLayer({ points }) {
         layerRef.current = null;
       }
     };
-  }, [map]);
+  }, [map, dataKey]);
 
-  // Redraw when points change
   useEffect(() => {
     const layer = layerRef.current;
-    if (!layer || !layer._redraw) return;
-    layer._redraw();
+    if (!layer || !layer.setPoints) return;
+    layer.setPoints(points);
   }, [points]);
 
   return null;
 }
 
-
-function SensorPointsLayer({ points }) {
+// ================= GENERIC DATA POINTS LAYER =================
+function DataPointsLayer({ points, dataKey, colorFn, formatValue, unit }) {
   return (
     <>
-      {(points || []).map((p) => (
-        <CircleMarker
-          key={p.id}
-          center={[p.lat, p.lng]}
-          radius={7}
-          pathOptions={{
-            color: "#ffffff",
-            weight: 2,
-            fillColor: getAqiColor(p.aqi),
-            fillOpacity: 1,
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -6]} opacity={1}>
-            <div className="text-center">
-              <strong>{p.label || p.id}</strong>
-              <div style={{ fontSize: '0.9em', marginTop: '4px' }}>
-                AQI: {Math.round(p.aqi)}<br />
-                {p.temperature != null && <>Temp: {Number(p.temperature).toFixed(1)}°C<br /></>}
-                {p.humidite != null && <>Hum: {Number(p.humidite).toFixed(0)}%<br /></>}
-                {p.uv != null && <>UV: {Number(p.uv).toFixed(1)}</>}
+      {(points || []).map((p) => {
+        const value = p[dataKey];
+        const color = colorFn(value);
+        const displayValue = formatValue ? formatValue(value) : value;
+
+        return (
+          <CircleMarker
+            key={`${p.id}-${dataKey}`}
+            center={[p.lat, p.lng]}
+            radius={7}
+            pathOptions={{
+              color: "#ffffff",
+              weight: 2,
+              fillColor: color,
+              fillOpacity: 1,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+              <div style={{ minWidth: 120 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{p.label}</div>
+                <div style={{ fontSize: 13 }}>
+                  {displayValue != null ? `${displayValue}${unit || ''}` : 'N/A'}
+                </div>
               </div>
-            </div>
-          </Tooltip>
-        </CircleMarker>
-      ))}
+            </Tooltip>
+          </CircleMarker>
+        );
+      })}
     </>
   );
 }
@@ -329,31 +402,47 @@ const KNOWN_LOCATIONS = {
 // ================= MAIN MAP =================
 export default function Map({
   center,
-  showPollution,
+  activeLayer, // 'pollution', 'temperature', 'humidity', 'uv', ou null
   localSensors = [],
   disabledSensorIds = [],
   onViewChange,
 }) {
-
   const [zoom, setZoom] = useState(13);
-  const showPoints = showPollution && zoom >= POINTS_ZOOM_THRESHOLD;
-  const showHeat = showPollution && zoom < POINTS_ZOOM_THRESHOLD;
+  const isZoomedIn = zoom >= POINTS_ZOOM_THRESHOLD;
 
-  const [sensorsData, setSensorsData] = useState(FALLBACK_SENSORS_DATA);
+  // Déterminer quel calque est actif
+  const showPollution = activeLayer === 'pollution';
+  const showTemperature = activeLayer === 'temperature';
+  const showHumidity = activeLayer === 'humidity';
+  const showUV = activeLayer === 'uv';
+
+  const [sensorsData, setSensorsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-mount des layers
 
   useEffect(() => {
-    async function fetchSensorData() {
+    async function fetchSensorData(retryCount = 0) {
+      console.log(`Map: Fetching sensor data (attempt ${retryCount + 1})...`);
       try {
         const result = await getSensorData();
-        if (result.success && result.data && Array.isArray(result.data)) {
 
-          // 1. Grouper par origin pour ne garder que le plus récent
+        console.log("Map: Server Action result:", result);
+
+        // Si erreur serveur (500) et qu'on peut encore réessayer (max 5 tentatives, 5s entre chaque)
+        if (!result.success && retryCount < 5) {
+          console.log(`Map: API error, retrying in 5 seconds... (${retryCount + 1}/5)`);
+          setTimeout(() => fetchSensorData(retryCount + 1), 5000);
+          return;
+        }
+
+        if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+          const data = result.data;
+          console.log("Map: Received", data.length, "items from API");
+
+          // 1. Dédoublonnage : ne garder que le plus récent par 'origin'
           const latestSensorsObj = {};
-
-          // Trier par timestamp croissant pour que le dernier écrase les précédents
-          const sortedData = [...result.data].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+          const sortedData = [...data].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
           sortedData.forEach((item) => {
             if (item.origin) {
@@ -361,35 +450,42 @@ export default function Map({
             }
           });
 
-          // 2. Transformer en tableau
-          const uniqueSensors = Object.values(latestSensorsObj);
-
-          const transformedData = uniqueSensors.map((item, index) => {
+          // 2. Transformer les données pour l'affichage
+          const transformedData = Object.values(latestSensorsObj).map((item, index) => {
             const origin = item.origin || `SENS-${index}`;
-            // Récupérer coords depuis connus ou item ou fallback 0
-            const coords = KNOWN_LOCATIONS[origin] || item.location || { lat: item.latitude || item.lat || 0, lng: item.longitude || item.lng || 0 };
+            // Récupérer coords depuis KNOWN_LOCATIONS
+            const coords = KNOWN_LOCATIONS[origin] || { lat: 0, lng: 0 };
 
-            // Estimer un AQI affichable (si qair < 1, on multiplie par 100 pour l'échelle, sinon on prend brut)
-            let valQair = item.qair && item.qair.length > 0 ? item.qair[0] : 0;
-            if (valQair > 0 && valQair < 1) valQair = valQair * 100;
+            // Calculer AQI à partir de qair (qualité de l'air)
+            let aqi = 50; // valeur par défaut
+            if (item.qair && Array.isArray(item.qair) && item.qair.length > 0) {
+              aqi = item.qair[0];
+              // Si c'est un ratio (0-1), convertir en échelle 0-100
+              if (aqi > 0 && aqi < 1) aqi = aqi * 100;
+            }
 
             return {
               id: origin,
               lat: coords.lat,
               lng: coords.lng,
-              aqi: valQair || (item.aqi || 50),
+              aqi: Math.round(aqi),
               label: origin,
-              desc: item.temperature ? `Temp: ${item.temperature}°C` : (item.description || "Données reçues"),
+              desc: item.temperature ? `Temp: ${item.temperature.toFixed(1)}°C` : "Capteur actif",
               temperature: item.temperature,
               humidite: item.humidite,
               uv: item.uv,
             };
           });
 
+          console.log("Map: Transformed sensors:", transformedData);
           setSensorsData(transformedData);
+          // Forcer le re-mount des layers après un court délai
+          setTimeout(() => setRefreshKey(k => k + 1), 50);
+        } else {
+          console.warn("Map: No data received from API or error:", result.error);
         }
       } catch (err) {
-        console.error("Erreur lors de la récupération des capteurs:", err);
+        console.error("Map: Error fetching sensor data:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -405,9 +501,13 @@ export default function Map({
 
   // Combiner les données de l'API avec les capteurs locaux
   const allSensors = [...sensorsData, ...localSensors];
-  const activeSensors = allSensors.filter(
-    (s) => !disabledSensorIds.includes(s.id)
+  const activeSensors = allSensors.filter((s) =>
+    !disabledSensorIds.includes(s.id) &&
+    s.lat != null && s.lng != null
   );
+
+  // Indicateur que les données ont été chargées au moins une fois
+  const dataLoaded = sensorsData.length > 0;
 
   return (
     <MapContainer
@@ -436,14 +536,88 @@ export default function Map({
       {/* Recentrage via recherche */}
       <RecenterMap center={center} />
 
-      {/* Pollution */}
-      {showHeat && (
-        <>
-          <SensorGradientLayer points={activeSensors} />
-        </>
+      {/* Force redraw quand les données arrivent */}
+      <MapRefresher dataCount={sensorsData.length} />
+
+      {/* =============== POLLUTION =============== */}
+      {dataLoaded && showPollution && !isZoomedIn && (
+        <DataGradientLayer
+          key={`pollution-heat-${refreshKey}`}
+          points={activeSensors}
+          dataKey="aqi"
+          colorFn={getAqiColor}
+        />
+      )}
+      {dataLoaded && showPollution && activeSensors.length > 0 && (
+        <DataPointsLayer
+          key={`pollution-points-${refreshKey}`}
+          points={activeSensors}
+          dataKey="aqi"
+          colorFn={getAqiColor}
+          formatValue={(v) => Math.round(v)}
+          unit=" AQI"
+        />
       )}
 
-      {showPoints && <SensorPointsLayer points={activeSensors} />}
+      {/* =============== TEMPERATURE =============== */}
+      {dataLoaded && showTemperature && !isZoomedIn && (
+        <DataGradientLayer
+          key={`temp-heat-${refreshKey}`}
+          points={activeSensors}
+          dataKey="temperature"
+          colorFn={getTemperatureColor}
+        />
+      )}
+      {dataLoaded && showTemperature && activeSensors.length > 0 && (
+        <DataPointsLayer
+          key={`temp-points-${refreshKey}`}
+          points={activeSensors}
+          dataKey="temperature"
+          colorFn={getTemperatureColor}
+          formatValue={(v) => v?.toFixed(1)}
+          unit="°C"
+        />
+      )}
+
+      {/* =============== HUMIDITY =============== */}
+      {dataLoaded && showHumidity && !isZoomedIn && (
+        <DataGradientLayer
+          key={`humidity-heat-${refreshKey}`}
+          points={activeSensors}
+          dataKey="humidite"
+          colorFn={getHumidityColor}
+        />
+      )}
+      {dataLoaded && showHumidity && activeSensors.length > 0 && (
+        <DataPointsLayer
+          key={`humidity-points-${refreshKey}`}
+          points={activeSensors}
+          dataKey="humidite"
+          colorFn={getHumidityColor}
+          formatValue={(v) => v?.toFixed(0)}
+          unit="%"
+        />
+      )}
+
+      {/* =============== UV =============== */}
+      {dataLoaded && showUV && !isZoomedIn && (
+        <DataGradientLayer
+          key={`uv-heat-${refreshKey}`}
+          points={activeSensors}
+          dataKey="uv"
+          colorFn={getUVColor}
+        />
+      )}
+      {dataLoaded && showUV && activeSensors.length > 0 && (
+        <DataPointsLayer
+          key={`uv-points-${refreshKey}`}
+          points={activeSensors}
+          dataKey="uv"
+          colorFn={getUVColor}
+          formatValue={(v) => v?.toFixed(1)}
+          unit=""
+        />
+      )}
 
 
     </MapContainer>

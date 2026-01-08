@@ -25,7 +25,9 @@ export default function Page() {
   const [showUserManagement, setShowUserManagement] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const [showPollution, setShowPollution] = useState(true);
+  // Calque de données actif (un seul à la fois)
+  // Valeurs possibles: 'pollution', 'temperature', 'humidity', 'uv', ou null
+  const [activeLayer, setActiveLayer] = useState('pollution');
 
   const [searchQuery, setSearchQuery] = useState("");
   const [mapCenter, setMapCenter] = useState([43.7102, 7.262]); // Nice par défaut
@@ -309,7 +311,7 @@ export default function Page() {
         }}
       >
         <Map
-          showPollution={showPollution}
+          activeLayer={activeLayer}
 
           center={mapCenter}
           localSensors={localSensors}
@@ -587,18 +589,76 @@ export default function Page() {
           <p className="fw-bold small text-muted mb-3">CALQUES ACTIFS</p>
 
           {/* Pollution */}
-          <div className="d-flex justify-content-between align-items-center mb-3">
+          <div
+            className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 cursor-pointer ${activeLayer === 'pollution' ? 'bg-primary bg-opacity-10 border border-primary' : 'hover-bg-light'}`}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setActiveLayer(activeLayer === 'pollution' ? null : 'pollution')}
+          >
             <div>
-              <div className="fw-semibold">Pollution (NO₂)</div>
-              <div className="small text-muted">Capteurs temps réel</div>
+              <div className="fw-semibold">🌫️ Pollution (NO₂)</div>
+              <div className="small text-muted">Qualité de l'air</div>
             </div>
             <Form.Check
-              type="switch"
-              checked={showPollution}
-              onChange={() => setShowPollution(!showPollution)}
+              type="radio"
+              name="activeLayer"
+              checked={activeLayer === 'pollution'}
+              onChange={() => setActiveLayer('pollution')}
             />
           </div>
 
+          {/* Température */}
+          <div
+            className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'temperature' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setActiveLayer(activeLayer === 'temperature' ? null : 'temperature')}
+          >
+            <div>
+              <div className="fw-semibold">🌡️ Température</div>
+              <div className="small text-muted">En degrés Celsius</div>
+            </div>
+            <Form.Check
+              type="radio"
+              name="activeLayer"
+              checked={activeLayer === 'temperature'}
+              onChange={() => setActiveLayer('temperature')}
+            />
+          </div>
+
+          {/* Humidité */}
+          <div
+            className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'humidity' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setActiveLayer(activeLayer === 'humidity' ? null : 'humidity')}
+          >
+            <div>
+              <div className="fw-semibold">💧 Humidité</div>
+              <div className="small text-muted">En pourcentage</div>
+            </div>
+            <Form.Check
+              type="radio"
+              name="activeLayer"
+              checked={activeLayer === 'humidity'}
+              onChange={() => setActiveLayer('humidity')}
+            />
+          </div>
+
+          {/* UV */}
+          <div
+            className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'uv' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+            style={{ cursor: 'pointer' }}
+            onClick={() => setActiveLayer(activeLayer === 'uv' ? null : 'uv')}
+          >
+            <div>
+              <div className="fw-semibold">☀️ Indice UV</div>
+              <div className="small text-muted">Exposition solaire</div>
+            </div>
+            <Form.Check
+              type="radio"
+              name="activeLayer"
+              checked={activeLayer === 'uv'}
+              onChange={() => setActiveLayer('uv')}
+            />
+          </div>
 
         </div>
       </aside>
@@ -629,18 +689,73 @@ export default function Page() {
             <div className="px-3 pb-4">
               <p className="fw-bold small text-muted mb-3">CALQUES ACTIFS</p>
 
-              <div className="d-flex justify-content-between align-items-center mb-3">
+              {/* Pollution */}
+              <div
+                className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'pollution' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+                onClick={() => setActiveLayer(activeLayer === 'pollution' ? null : 'pollution')}
+              >
                 <div>
-                  <div className="fw-semibold">Pollution (NO₂)</div>
-                  <div className="small text-muted">Capteurs temps réel</div>
+                  <div className="fw-semibold">🌫️ Pollution (NO₂)</div>
+                  <div className="small text-muted">Qualité de l'air</div>
                 </div>
                 <Form.Check
-                  type="switch"
-                  checked={showPollution}
-                  onChange={() => setShowPollution(!showPollution)}
+                  type="radio"
+                  name="mobileActiveLayer"
+                  checked={activeLayer === 'pollution'}
+                  onChange={() => setActiveLayer('pollution')}
                 />
               </div>
 
+              {/* Température */}
+              <div
+                className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'temperature' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+                onClick={() => setActiveLayer(activeLayer === 'temperature' ? null : 'temperature')}
+              >
+                <div>
+                  <div className="fw-semibold">🌡️ Température</div>
+                  <div className="small text-muted">En degrés Celsius</div>
+                </div>
+                <Form.Check
+                  type="radio"
+                  name="mobileActiveLayer"
+                  checked={activeLayer === 'temperature'}
+                  onChange={() => setActiveLayer('temperature')}
+                />
+              </div>
+
+              {/* Humidité */}
+              <div
+                className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'humidity' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+                onClick={() => setActiveLayer(activeLayer === 'humidity' ? null : 'humidity')}
+              >
+                <div>
+                  <div className="fw-semibold">💧 Humidité</div>
+                  <div className="small text-muted">En pourcentage</div>
+                </div>
+                <Form.Check
+                  type="radio"
+                  name="mobileActiveLayer"
+                  checked={activeLayer === 'humidity'}
+                  onChange={() => setActiveLayer('humidity')}
+                />
+              </div>
+
+              {/* UV */}
+              <div
+                className={`d-flex justify-content-between align-items-center mb-2 p-2 rounded-3 ${activeLayer === 'uv' ? 'bg-primary bg-opacity-10 border border-primary' : ''}`}
+                onClick={() => setActiveLayer(activeLayer === 'uv' ? null : 'uv')}
+              >
+                <div>
+                  <div className="fw-semibold">☀️ Indice UV</div>
+                  <div className="small text-muted">Exposition solaire</div>
+                </div>
+                <Form.Check
+                  type="radio"
+                  name="mobileActiveLayer"
+                  checked={activeLayer === 'uv'}
+                  onChange={() => setActiveLayer('uv')}
+                />
+              </div>
 
             </div>
           </div>

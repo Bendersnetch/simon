@@ -44,19 +44,25 @@ export async function getSensorData() {
     try {
         const apiGatewayUrl = process.env.API_GATEWAY_URL;
         // Public endpoint, no auth needed usually, but can add if required
+        console.log(`[getSensorData] Fetching from: ${apiGatewayUrl}/api/v1/sensor-data-gateway/recent`);
         const response = await fetch(`${apiGatewayUrl}/api/v1/sensor-data-gateway/recent`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
             },
+            cache: 'no-store' // Important pour ne pas cacher les données de capteurs
         });
 
+        console.log(`[getSensorData] Response status: ${response.status}`);
+
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Failed to fetch sensor data');
+            const text = await response.text();
+            console.error(`[getSensorData] Error body: ${text}`);
+            throw new Error(`API Error ${response.status}: ${text}`);
         }
 
         const data = await response.json();
+        console.log(`[getSensorData] Data received (sample):`, Array.isArray(data) ? `Array of ${data.length} items` : typeof data);
         return { success: true, data };
     } catch (error) {
         console.error('Sensor data error:', error);
