@@ -41,20 +41,3 @@ Le backend est développé avec **NestJS** et structuré comme suit :
 3.  **TTN** transfère la charge utile (payload) au **Service d'Ingestion**.
 4.  Les données sont validées, traitées et stockées dans **Cassandra**.
 5.  Les clients accèdent aux données via l'**API Gateway**.
-
-## Démarrage
-### Configuration Matérielle
-1.  Flashez l'Arduino avec le code situé dans `iot/capteur/lora-abp.ino`.
-2.  Configurez les clés de votre appareil TTN (DevAddr, NwkSKey, AppSKey) dans le fichier sketch.
-3.  Installez le Single Channel Packet Forwarder sur votre Raspberry Pi en utilisant le fichier de service `iot/passerelle/ttn_forwarder.service`.
-
-### Configuration Backend
-1.  Naviguez vers le répertoire `api`.
-2.  Installez les dépendances pour chaque service :
-    ```bash
-    npm install
-    ```
-3.  Démarrez les services :
-    ```bash
-    npm run start:dev
-    ```
