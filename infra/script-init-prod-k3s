@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Script d'installation de l'environnement de production
-# Utilise Minikube avec driver Docker + tunnel automatisé
+# Script d'installation de l'environnement de production avec k3s
+# k3s s'exécute directement sur l'hôte (pas dans un conteneur)
 
 # Demander le nom de domaine Azure
 echo "======================================"
-echo "Initialisation environnement PROD"
+echo "Initialisation environnement PROD (k3s)"
 echo "======================================"
 echo ""
 read -p "Entrez le nom DNS de votre VM Azure (ex: simon-vm.francecentral.cloudapp.azure.com): " AZURE_DNS
@@ -17,61 +17,34 @@ fi
 echo "✓ Nom DNS configuré: $AZURE_DNS"
 echo ""
 
-# Vérifier et installer Docker
-if ! command -v docker &> /dev/null; then
-    echo "Installation de Docker (nécessite sudo)..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    rm get-docker.sh
-    echo "Docker installé."
-fi
-
-# Ajouter l'utilisateur au groupe docker si nécessaire
-if ! groups | grep -q docker; then
-    echo "Ajout de l'utilisateur au groupe docker (nécessite sudo)..."
-    sudo usermod -aG docker $USER
-    echo "⚠️  Vous devez vous déconnecter/reconnecter ou exécuter: newgrp docker"
-    echo "   Puis relancer ce script"
-    exit 0
-fi
-
+# Installer k3s avec Traefik désactivé (on utilisera nginx-ingress)
+echo "======================================"
+echo "Installation de k3s"
+echo "======================================"
 echo ""
 
-# Installer kubectl si non présent
-if ! command -v kubectl &> /dev/null; then
-    echo "Installation de kubectl (nécessite sudo)..."
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-    rm kubectl
-    echo "kubectl installé."
+if command -v k3s &> /dev/null; then
+    echo "k3s est déjà installé"
+else
+    echo "Installation de k3s (nécessite sudo)..."
+    curl -sfL https://get.k3s.io | sh -s - \
+        --write-kubeconfig-mode 644 \
+        --disable traefik
+
+    echo "✓ k3s installé"
 fi
 
-# Installer minikube si non présent
-if ! command -v minikube &> /dev/null; then
-    echo "Installation de minikube (nécessite sudo)..."
-    curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-    sudo install minikube-linux-amd64 /usr/local/bin/minikube
-    rm minikube-linux-amd64
-    echo "Minikube installé."
-fi
+# Configurer kubectl
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> ~/.bashrc
 
-# Démarrer minikube avec le driver Docker
-echo "Démarrage de minikube..."
-echo "⏱️  Cela peut prendre quelques minutes..."
-echo "Configuration : 3 CPUs / 10 GB RAM / Driver Docker"
+# Attendre que k3s soit prêt
+echo "Attente que k3s soit prêt..."
+sleep 15
+kubectl wait --for=condition=Ready nodes --all --timeout=60s
 
-minikube start \
-  --driver=docker \
-  --cpus=3 \
-  --memory=10240 \
-  --wait=all \
-  --wait-timeout=10m
-
-echo "✓ Minikube démarré avec succès"
-
-# Configurer kubectl pour utiliser minikube
-export KUBECONFIG=~/.kube/config
-minikube update-context
+echo "✓ k3s démarré avec succès"
+echo ""
 
 # Installer Helm si non présent
 if ! command -v helm &> /dev/null; then
@@ -87,27 +60,28 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 
 # Créer namespaces
-kubectl create namespace argocd
-kubectl create namespace ingress-nginx
-kubectl create namespace monitoring
-kubectl create namespace simon-prod
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace simon-prod --dry-run=client -o yaml | kubectl apply -f -
 
-# Installer nginx-ingress controller avec hostNetwork
+# Installer nginx-ingress controller avec hostPort (fonctionne nativement sur k3s)
 echo "======================================"
 echo "Installation de nginx-ingress"
 echo "======================================"
 echo ""
 
-helm install ingress-nginx ingress-nginx/ingress-nginx \
-  \
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx \
-  --set controller.hostNetwork=true \
   --set controller.kind=DaemonSet \
+  --set controller.hostPort.enabled=true \
+  --set controller.hostPort.ports.http=80 \
+  --set controller.hostPort.ports.https=443 \
   --set controller.service.type=ClusterIP \
   --wait \
   --timeout 5m
 
-echo "✓ nginx-ingress installé (hostNetwork - ports 80 et 443 directement sur l'hôte)"
+echo "✓ nginx-ingress installé (hostPort 80/443 - exposition directe)"
 echo ""
 
 # Attendre que nginx soit prêt
@@ -116,7 +90,7 @@ kubectl wait --namespace ingress-nginx \
   --selector=app.kubernetes.io/component=controller \
   --timeout=120s
 
-echo "✓ nginx-ingress prêt et accessible sur les ports 80 et 443 de la VM"
+echo "✓ nginx-ingress prêt"
 echo ""
 
 # Installer ArgoCD via Helm
@@ -125,8 +99,7 @@ echo "Installation d'ArgoCD"
 echo "======================================"
 echo ""
 
-helm install argocd argo/argo-cd \
-  \
+helm upgrade --install argocd argo/argo-cd \
   --namespace argocd \
   --set server.service.type=ClusterIP \
   --set server.insecure=true \
@@ -137,8 +110,7 @@ echo "✓ ArgoCD installé"
 echo ""
 
 # Installer ArgoCD Image Updater via Helm
-helm install argocd-image-updater argo/argocd-image-updater \
-  \
+helm upgrade --install argocd-image-updater argo/argocd-image-updater \
   --namespace argocd \
   --wait
 
@@ -162,7 +134,6 @@ metadata:
   name: argocd-image-updater-config
   namespace: argocd
 data:
-  # Liste des registres à surveiller (Docker Hub par défaut)
   registries.conf: |
     registries:
     - name: Docker Hub
@@ -174,28 +145,6 @@ EOF
 
 echo "✓ Configuration du registry pour Image Updater"
 echo ""
-echo "⚠️  IMPORTANT: Pour que l'Image Updater puisse surveiller vos images:"
-echo "   1. Créez un secret pour vos credentials Docker Hub (si images privées):"
-echo "      kubectl create secret docker-registry dockerhub-secret \\"
-echo "        --docker-server=https://registry-1.docker.io \\"
-echo "        --docker-username=<username> \\"
-echo "        --docker-password=<password> \\"
-echo "        --docker-email=<email> \\"
-echo "        -n argocd"
-echo ""
-echo "   2. Dans vos Applications ArgoCD, ajoutez ces annotations:"
-echo "      argocd-image-updater.argoproj.io/image-list: <nom-image>:<registry>/<image>:<version>"
-echo "      argocd-image-updater.argoproj.io/update-strategy: semver"
-echo ""
-echo "   Exemple pour une API:"
-echo "      argocd-image-updater.argoproj.io/image-list: api-capteur=dockerhub/simon/api-capteur:~1.0"
-echo "      argocd-image-updater.argoproj.io/update-strategy: semver"
-echo ""
-
-
-# Créer namespaces pour monitoring et applications
-kubectl create namespace monitoring || true
-kubectl create namespace simon-prod || true
 
 # Installer Prometheus via Helm
 echo "======================================"
@@ -203,8 +152,7 @@ echo "Installation de Prometheus"
 echo "======================================"
 echo ""
 
-helm install prometheus prometheus-community/kube-prometheus-stack \
-  \
+helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --set prometheus.service.type=ClusterIP \
   --set grafana.service.type=ClusterIP \
@@ -219,9 +167,6 @@ echo "======================================"
 echo "Configuration des Ingress"
 echo "======================================"
 echo ""
-
-# Créer un dossier temporaire pour les manifests
-mkdir -p /tmp/k8s-manifests
 
 # Créer le dossier ingress dans prod si nécessaire
 mkdir -p prod/ingress
@@ -250,10 +195,6 @@ spec:
             port:
               number: 80
 EOF
-
-# Attendre que le webhook nginx soit prêt
-echo "⏱️  Attente du webhook nginx-ingress (30 secondes)..."
-sleep 30
 
 # Appliquer l'Ingress ArgoCD
 kubectl apply -f prod/ingress/argocd.yaml
@@ -318,56 +259,7 @@ kubectl set env deployment/prometheus-grafana \
   GF_SERVER_ROOT_URL="http://${AZURE_DNS}/grafana" \
   GF_SERVER_SERVE_FROM_SUB_PATH="true"
 
-# Ingress pour le Frontend
-cat > prod/ingress/frontend.yaml <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: frontend-ingress
-  namespace: simon-prod
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: ${AZURE_DNS}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend-service
-            port:
-              number: 80
-EOF
-
-# Ingress pour l'API Gateway
-cat > prod/ingress/api-gateway.yaml <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: api-gateway-ingress
-  namespace: simon-prod
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/rewrite-target: /\$2
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: ${AZURE_DNS}
-    http:
-      paths:
-      - path: /api(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: api-gateway-client-service
-            port:
-              number: 3003
-EOF
-
-echo "✓ Ingress créés pour ArgoCD, Prometheus, Grafana, Frontend et API Gateway"
+echo "✓ Ingress créés pour ArgoCD, Prometheus et Grafana"
 echo "✓ Tous les fichiers Ingress sauvegardés dans prod/ingress/"
 echo ""
 
@@ -385,10 +277,9 @@ echo "Setup production terminé!"
 echo "======================================"
 echo ""
 echo "Infrastructure installée :"
-echo "  ✓ kubectl"
-echo "  ✓ Minikube (driver: docker)"
+echo "  ✓ k3s (Kubernetes natif sur l'hôte)"
 echo "  ✓ Helm"
-echo "  ✓ nginx-ingress (hostNetwork - ports 80/443 sur l'hôte)"
+echo "  ✓ nginx-ingress (hostPort - exposition directe sur ports 80/443)"
 echo "  ✓ ArgoCD + ArgoCD Image Updater"
 echo "  ✓ Prometheus + Grafana"
 echo ""
@@ -425,22 +316,28 @@ echo "  - monitoring    (Prometheus, Grafana, AlertManager)"
 echo "  - simon-prod    (Vos applications)"
 echo ""
 echo "======================================"
+echo "Vérifications"
+echo "======================================"
+echo ""
+echo "Nginx écoute sur les ports 80/443 :"
+sudo ss -tulpn | grep -E ':(80|443) ' || echo "⚠️  Nginx ne semble pas écouter sur 80/443"
+echo ""
+echo "Tous les pods :"
+kubectl get pods -A
+echo ""
+echo "======================================"
 echo "Prochaines étapes"
 echo "======================================"
 echo "  1. ✓ Ports 80 et 443 déjà ouverts dans votre NSG Azure"
 echo "  2. Connectez-vous à ArgoCD: http://${AZURE_DNS}/argocd"
 echo "  3. Configurez vos credentials Docker Hub (si images privées):"
 echo "     kubectl create secret docker-registry dockerhub-secret \\"
-echo "       --docker-server=https://registry-1.docker.io \\"
-echo "       --docker-username=<user> --docker-password=<token> \\"
-echo "       -n argocd"
+echo "     --docker-server=https://registry-1.docker.io \\"
+echo "     --docker-username=<user> --docker-password=<token> \\"
+echo "     -n argocd"
 echo "  4. Déployez vos applications via ArgoCD"
-echo "     - Les fichiers Ingress sont déjà créés dans prod/ingress/"
-echo "     - Frontend accessible sur: http://${AZURE_DNS}/"
-echo "     - API Gateway accessible sur: http://${AZURE_DNS}/api"
-echo "  5. Ajoutez les annotations Image Updater pour auto-update"
-echo "  6. Consultez Prometheus: http://${AZURE_DNS}/prometheus"
-echo "  7. Consultez Grafana: http://${AZURE_DNS}/grafana"
+echo "  5. Consultez Prometheus: http://${AZURE_DNS}/prometheus"
+echo "  6. Consultez Grafana: http://${AZURE_DNS}/grafana"
 echo ""
 echo "Commandes utiles:"
 echo "  kubectl get all -n simon-prod         # Voir vos apps"
@@ -448,5 +345,5 @@ echo "  kubectl get applications -n argocd    # Apps ArgoCD"
 echo "  kubectl get ingress -A                # Voir les Ingress"
 echo "  kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater"
 echo "  kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller"
-echo "  minikube status                       # Statut de Minikube"
+echo "  systemctl status k3s                  # Statut de k3s"
 echo ""

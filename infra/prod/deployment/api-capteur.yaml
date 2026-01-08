@@ -28,6 +28,8 @@ spec:
             sleep 2
           done
           echo "Postgres is ready!"
+      imagePullSecrets:
+      - name: dockerhub-secret
       containers:
       - name: api-capteur-container
         # Image depuis Docker Hub - sera mis à jour par ArgoCD Image Updater

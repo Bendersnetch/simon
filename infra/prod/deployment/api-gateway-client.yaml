@@ -27,6 +27,8 @@ spec:
             sleep 2
           done
           echo "Postgres is ready!"
+      imagePullSecrets:
+      - name: dockerhub-secret
       containers:
       - name: api-gateway-client-container
         image: beirdinhos/api-gateway-client:latest
@@ -55,8 +57,8 @@ spec:
               key: DB_USERNAME
         - name: DB_PASSWORD
           valueFrom:
-            configMapKeyRef:
-              name: api-gateway-client-config
+            secretKeyRef:
+              name: app-credentials
               key: DB_PASSWORD
         - name: DB_DATABASE
           valueFrom:
