@@ -39,6 +39,8 @@ spec:
             sleep 5
           done
           echo "Cassandra is fully ready!"
+      imagePullSecrets:
+      - name: dockerhub-secret
       containers:
       - name: service-ingestion-bdd-container
         image: beirdinhos/service-ingestion-bdd:latest

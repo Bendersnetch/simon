@@ -27,6 +27,8 @@ spec:
             sleep 5
           done
           echo "Keyspace 'capteur_data' is ready!"
+      imagePullSecrets:
+      - name: dockerhub-secret
       containers:
       - name: api-sensor-data-container
         image: beirdinhos/api-sensor-data:latest
