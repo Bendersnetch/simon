@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 export class AuthGatewayService {
     constructor(private readonly httpService: HttpService) {}
 
-    private BASE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:3002/api/v1";
+    private BASE_URL = process.env.AUTH_USER_SERVICE_URL || "http://localhost:3002/api/v1";
 
     async register(createUserDto: CreateUserDto): Promise<UserResponseDto> {
         const response$ = this.httpService.post(`${this.BASE_URL}/auth/register`, createUserDto);
