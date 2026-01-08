@@ -1,3 +1,4 @@
+![Architecture](./docs/architecture.png)
 # Réseau de Capteurs IoT avec LoRaWAN & Microservices NestJS
 
 ## Aperçu du Projet
