@@ -1,0 +1,13 @@
+# Fichiers de secrets (contiennent les vrais mots de passe)
+# NE PAS COMMITTER !
+*-secret.yaml
+postgres-secret.yaml
+credentials-secret.yaml
+
+# Logs
+*.log
+*.err
+
+# Archives temporaires
+*.tar.gz
+*.zip
